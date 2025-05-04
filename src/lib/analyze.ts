@@ -1,5 +1,5 @@
 import type { Expr } from "./ast"
-import { getAverage, getLevel, type Params } from "./eval"
+import { compute, getLevel, tableAverage, tableMax, tableMin, tableStddev, type Params } from "./eval"
 import { parse } from "./parse"
 
 export interface SpellAnalysis {
@@ -7,7 +7,10 @@ export interface SpellAnalysis {
     name: string
     expr: Expr
     level: number | null
-    average: number | string
+    average: number | null
+    stddev: number | null
+    min: number | null
+    max: number | null
 }
 
 export interface CollectionAnalysis {
@@ -29,14 +32,20 @@ function analyzeLine(line: string, p: Params, lineNum: number): SpellAnalysis {
     try {
         const expr = parse(raw)
         const level = getLevel(expr)
+        const table = compute(expr, p)
+        const average = tableAverage(table)
         return {
             lineNum,
             name,
             expr,
             level: level === -1 ? null : level,
-            average: getAverage(expr, p),
+            average,
+            stddev: tableStddev(table, average),
+            min: tableMin(table),
+            max: tableMax(table),
         }
     } catch (e) {
+        console.error(e)
         throw `${name}: ${e}`
     }
 }

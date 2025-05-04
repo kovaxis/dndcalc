@@ -19,13 +19,13 @@ export const OP_NAMES = [
 export type OpName = typeof OP_NAMES[number]
 
 export const SKILLS = [
+    'atk',
+    'str',
+    'dex',
+    'con',
     'int',
     'wis',
-    'dex',
-    'str',
     'cha',
-    'con',
-    'atk',
 ] as const
 
 export type Skill = typeof SKILLS[number]
@@ -70,10 +70,13 @@ export interface Op {
     rhs: Expr
 }
 
-export type Expr =
+export type Atom =
     | Lit
     | Die
-    | Op
     | Check
     | Variable
     | Level
+
+export type Expr =
+    | Atom
+    | Op
