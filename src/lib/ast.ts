@@ -3,10 +3,14 @@
 export const OP_CHARS = {
     '+': [0, 'l'],
     '-': [0, 'l'],
-    '': [1, 'l'],
-    '*': [1, 'l'],
-    '/': [1, 'l'],
-    '^': [2, 'r'],
+    // empty spaces are equivalent to *
+    // multiplication is right-associative, because multiplication is actually convolution
+    '': [1, 'r'],
+    '*': [1, 'r'],
+    // division has higher precedence than multiplication, to preserve conventions
+    // i am 99% percent sure that making division higher precedence than multiplication and left-to-right makes operations with constant numbers behave the same as standard arithmetic
+    '/': [2, 'l'],
+    '^': [3, 'r'],
 } as const
 
 export type OpChar = keyof typeof OP_CHARS
@@ -36,6 +40,13 @@ export const VARIABLES = [
 ] as const
 
 export type VariableKind = typeof VARIABLES[number]
+
+export const UNOP_NAMES = [
+    'floor',
+    'ceil',
+] as const
+
+export type UnopName = typeof UNOP_NAMES[number]
 
 export interface Lit {
     ty: 'lit'
@@ -70,6 +81,12 @@ export interface Op {
     rhs: Expr
 }
 
+export interface Unop {
+    ty: 'unop'
+    op: UnopName
+    inner: Expr
+}
+
 export type Atom =
     | Lit
     | Die
@@ -80,3 +97,4 @@ export type Atom =
 export type Expr =
     | Atom
     | Op
+    | Unop

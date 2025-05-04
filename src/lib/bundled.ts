@@ -1,8 +1,7 @@
 export const EXAMPLE: string = `
-Burning Hands: area[3d6 dexh]
-Catapult: 3d8 dex
-Chromatic Orb: 3d8 atk
-Frost Fingers: area[2d8 conh]
+Magic Missile: (3 + lvl1)(1d4+1)
+Scorching Ray: lvl2[3] atk 2d6
+Fireball: area dexh lvl3[8]d6
 `.trim()
 
 export const DND5E_WIZARD: string = `

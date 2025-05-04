@@ -1,8 +1,10 @@
 <script lang="ts">
   import { analyze } from "./lib/analyze";
   import { SKILLS } from "./lib/ast";
+  import Bar from "./lib/Bar.svelte";
   import * as bundled from "./lib/bundled";
   import type { Params } from "./lib/eval";
+  import Graph from "./lib/Graph.svelte";
 
   function formatDelta(x: number): string {
     return `${x > 0 ? "+" : ""}${x.toFixed()}`;
@@ -66,8 +68,24 @@
     localStorage.setItem(PARAMS_KEY, JSON.stringify(pstate));
   });
 
-  const TABLE_TOTAL_WIDTH: string = "29em";
-  const TABLE_COLUMNS: string = "minmax(15em, 1fr) 3em 5em";
+  const maxLevel = $derived(
+    Math.max(1, ...analysis.spells.map((spell) => spell.level ?? 0)),
+  );
+  const maxAverage = $derived(
+    Math.ceil(
+      Math.max(1, ...analysis.spells.map((spell) => spell.average ?? 0)),
+    ),
+  );
+  const maxStddev = $derived(
+    Math.ceil(
+      Math.max(1, ...analysis.spells.map((spell) => spell.stddev ?? 0)),
+    ),
+  );
+  const maxValue = $derived(
+    Math.ceil(Math.max(1, ...analysis.spells.map((spell) => spell.max ?? 0))),
+  );
+
+  const TABLE_COLUMNS: string = "minmax(12em, 1fr) 3em 5em 5em 6em";
 
   function gridcell(row: number, column: number) {
     return `grid-column: ${column}; grid-row: ${row + 1}; background-color: ${row % 2 ? "#303030" : ""}`;
@@ -76,16 +94,18 @@
 
 <main class="fdown facenter" style="gap: 1cm">
   <div class="analysis-parameters">
-    <div class="analysis" style="max-width: {TABLE_TOTAL_WIDTH};">
-      <h2>Analysis</h2>
+    <div class="analysis">
+      <h2>Damage analysis</h2>
       <div
         style="
         display: grid; gap: 2px; grid-template-columns: {TABLE_COLUMNS}; grid-auto-rows: min-content;
         "
       >
-        <div class="cell" style="grid-column: 1;">Spell</div>
-        <div class="cell" style="grid-column: 2;">Level</div>
-        <div class="cell" style="grid-column: 3;">Average damage</div>
+        <div class="cell">Spell</div>
+        <div class="cell">Level</div>
+        <div class="cell">Average</div>
+        <div class="cell">Deviation</div>
+        <div class="cell">Distribution</div>
       </div>
       <div
         style="
@@ -96,14 +116,23 @@
         {#each analysis.spells as spell, i}
           <div class="cell" style={gridcell(i, 1)}>{spell.name}</div>
           <div class="cell" style={gridcell(i, 2)}>
+            <Bar full={(spell.level ?? 0) / maxLevel} />
             <span style:color={spell.level == null ? "red" : undefined}>
               {spell.level ?? "?"}
             </span>
           </div>
           <div class="cell" style={gridcell(i, 3)}>
+            <Bar full={(spell.average ?? 0) / maxAverage} />
             {spell.average == null
               ? "-"
               : Math.round(spell.average * 100) / 100}
+          </div>
+          <div class="cell" style={gridcell(i, 4)}>
+            <Bar full={(spell.stddev ?? 0) / maxStddev} />
+            {spell.stddev == null ? "-" : Math.round(spell.stddev * 100) / 100}
+          </div>
+          <div class="cell" style={gridcell(i, 5)}>
+            <Graph values={spell.damage} {maxValue} />
           </div>
         {/each}
       </div>
@@ -213,6 +242,7 @@
   }
 
   .cell {
+    position: relative;
     min-width: 0px;
     min-height: fit-content;
     overflow-x: hidden;

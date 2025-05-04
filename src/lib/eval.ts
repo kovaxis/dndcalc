@@ -1,4 +1,4 @@
-import type { Expr, OpName, OpChar, Atom } from "./ast"
+import type { Expr, OpName, OpChar, Atom, UnopName } from "./ast"
 
 export interface Params {
     chances: Record<string, number>
@@ -12,7 +12,10 @@ function enter(expr: Expr, visit: (expr: Expr) => void): void {
         case 'op':
             visit(expr.lhs)
             visit(expr.rhs)
-            break
+            return
+        case 'unop':
+            visit(expr.inner)
+            return
         case 'var': case 'check': case 'die': case 'lit': case 'lvl':
             return
         default:
@@ -25,37 +28,96 @@ export interface Table {
     denominator: bigint
 }
 
-function constOperate(op: OpChar | OpName, lhs: number, rhs: number): number {
+function constSingleOperate(op: UnopName, inner: number): number {
     switch (op) {
-        case '':
-            return lhs * rhs
-        case '+':
-            return lhs + rhs
-        case '-':
-            return lhs - rhs
-        case '*':
-            return lhs * rhs
-        case '/':
-            return Math.floor(lhs / rhs)
-        case '^':
-            return lhs ** rhs
-        case 'max':
-            return Math.max(lhs, rhs)
-        case 'min':
-            return Math.min(lhs, rhs)
+        case 'floor':
+            return Math.floor(inner)
+        case 'ceil':
+            return Math.ceil(inner)
     }
 }
 
-function tableOperate(op: OpChar | OpName, lhs: Table, rhs: Table): Table {
+function convolve(lhs: Table, rhs: Table): Table {
     const out: Table = {
         counts: new Map(),
         denominator: lhs.denominator * rhs.denominator,
     }
     for (const [lval, lcnt] of lhs.counts.entries()) {
         for (const [rval, rcnt] of rhs.counts.entries()) {
-            const fval = constOperate(op, lval, rval)
+            const fval = lval + rval
             out.counts.set(fval, (out.counts.get(fval) ?? BigInt(0)) + lcnt * rcnt)
         }
+    }
+    return out
+}
+
+function tableOperate(op: OpChar | OpName, lhs: Table, rhs: Table): Table {
+    if ((op === '' || op === '*') && lhs.counts.size > 0 && lhs.counts.keys().every(val => Math.floor(val) === val && val >= 0) && lhs.counts.keys().some(val => val >= 2)) {
+        // Multiplication with a nonnegative integral left-hand-side is special: it is iterated convolution
+        console.log('convolving', lhs, 'and', rhs)
+        const upTo = Math.max(...lhs.counts.keys())
+        const out: Table = {
+            counts: new Map(),
+            denominator: lhs.denominator * rhs.denominator ** BigInt(upTo),
+        }
+        console.log('upTo:', upTo)
+        console.log('rhsDenom:', rhs.denominator ** BigInt(upTo))
+        console.log('finalDenom:', out.denominator)
+        let tmp = newTable([[0, 1]])
+        for (let lval = 0; lval <= upTo; lval++) {
+            const lcnt = lhs.counts.get(lval)
+            if (lcnt !== undefined) {
+                console.log('applying lval =', lval, 'with rtmp =', tmp)
+                const rhsScaleup = rhs.denominator ** BigInt(upTo - lval)
+                for (const [rval, rcnt] of tmp.counts.entries()) {
+                    out.counts.set(rval, (out.counts.get(rval) ?? BigInt(0)) + lcnt * rhsScaleup * rcnt)
+                }
+                console.log('accumulated result is', out)
+            }
+            if (lval < upTo) tmp = convolve(tmp, rhs)
+        }
+        console.log("convolved", lhs, "and", rhs, "to obtain", out)
+        return out
+    } else {
+        const out: Table = {
+            counts: new Map(),
+            denominator: lhs.denominator * rhs.denominator,
+        }
+        for (const [lval, lcnt] of lhs.counts.entries()) {
+            for (const [rval, rcnt] of rhs.counts.entries()) {
+                const fval = (() => {
+                    switch (op) {
+                        case '': case '*':
+                            return Math.floor(lval * rval)
+                        case '+':
+                            return lval + rval
+                        case '-':
+                            return lval - rval
+                        case '/':
+                            return Math.floor(lval / rval)
+                        case '^':
+                            return lval ** rval
+                        case 'max':
+                            return Math.max(lval, rval)
+                        case 'min':
+                            return Math.min(lval, rval)
+                    }
+                })()
+                out.counts.set(fval, (out.counts.get(fval) ?? BigInt(0)) + lcnt * rcnt)
+            }
+        }
+        return out
+    }
+}
+
+function tableSingleOperate(op: UnopName, inner: Table): Table {
+    const out: Table = {
+        counts: new Map(),
+        denominator: inner.denominator,
+    }
+    for (const [ival, icnt] of inner.counts.entries()) {
+        const fval = constSingleOperate(op, ival)
+        out.counts.set(fval, (out.counts.get(fval) ?? BigInt(0)) + icnt)
     }
     return out
 }
@@ -109,7 +171,7 @@ export function tableStddev(table: Table, average: number | null): number | null
     if (average === null || Number(table.denominator) === 0) return null
     let variance = BigInt(0)
     for (const [val, cnt] of table.counts) {
-        variance += BigInt(Math.round((val - average) * 2 ** 53)) ** BigInt(2) * cnt
+        variance += BigInt(Math.round((val - average) ** 2 * 2 ** 53)) * cnt
     }
     return Math.sqrt(Number(variance / table.denominator) / (2 ** 53))
 }
@@ -124,9 +186,15 @@ export function tableMax(table: Table): number | null {
     return max === -Infinity ? null : max
 }
 
-export function compute(expr: Expr, p: Params): Table {
-    if (expr.ty === 'op') return tableOperate(expr.op, compute(expr.lhs, p), compute(expr.rhs, p))
+function computeFract(expr: Expr, p: Params): Table {
+    if (expr.ty === 'op') return tableOperate(expr.op, computeFract(expr.lhs, p), computeFract(expr.rhs, p))
+    else if (expr.ty === 'unop') return tableSingleOperate(expr.op, computeFract(expr.inner, p))
     else return tableAtomEval(expr, p)
+}
+
+export function compute(expr: Expr, p: Params): Table {
+    console.log('computing expression', expr)
+    return computeFract({ ty: 'unop', op: 'floor', inner: expr }, p)
 }
 
 export function getLevel(expr: Expr): number {

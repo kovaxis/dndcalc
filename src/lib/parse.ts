@@ -1,16 +1,7 @@
-import { VARIABLES, OP_CHARS, SKILLS, type Expr, type VariableKind, type OpChar, type Skill, OP_NAMES, type OpName } from "./ast"
+import { VARIABLES, OP_CHARS, SKILLS, type Expr, type VariableKind, type OpChar, type Skill, OP_NAMES, type OpName, UNOP_NAMES, type UnopName } from "./ast"
 
-
-function isSkill(s: string): boolean {
-    return (SKILLS as readonly string[]).includes(s)
-}
-
-function isVariable(s: string): boolean {
-    return (VARIABLES as readonly string[]).includes(s)
-}
-
-function isNamedOp(s: string): boolean {
-    return (OP_NAMES as readonly string[]).includes(s)
+function isListed(s: string, list: readonly string[]): boolean {
+    return list.includes(s)
 }
 
 class Parser {
@@ -84,14 +75,17 @@ class Parser {
             }
             const isDie = name.match(/^d([1-9][0-9]*)$/)
             const isLvl = name.match(/^lvl([1-9][0-9]*)$/)
-            if (isVariable(name)) {
+            if (isListed(name, VARIABLES)) {
                 args(0)
                 return { ty: 'var', kind: name as VariableKind }
-            } else if (isNamedOp(name)) {
+            } else if (isListed(name, OP_NAMES)) {
                 const a = args(2, null)
                 let expr: Expr = a[0]
                 for (let i = 1; i < a.length; i++) expr = { ty: 'op', op: name as OpName, lhs: expr, rhs: a[i] }
                 return expr
+            } else if (isListed(name, UNOP_NAMES)) {
+                const [inner] = args(1)
+                return { ty: 'unop', op: name as UnopName, inner }
             } else if (isDie) {
                 args(0)
                 const [, n] = isDie
@@ -105,10 +99,10 @@ class Parser {
                     // lvlN[x] == (x + lvlN)
                     return { ty: 'op', op: '+', lhs: inner[0], rhs: { ty: 'lvl', level: parseInt(level) } }
                 }
-            } else if (isSkill(name)) {
+            } else if (isListed(name, SKILLS)) {
                 args(0)
                 return { ty: 'check', skill: name as Skill, half: false }
-            } else if (name.endsWith('h') && isSkill(name.slice(0, -1))) {
+            } else if (name.endsWith('h') && isListed(name.slice(0, -1), SKILLS)) {
                 args(0)
                 return { ty: 'check', skill: name.slice(0, -1) as Skill, half: true }
             } else {
@@ -136,7 +130,7 @@ class Parser {
                     break
                 } else {
                     if (nextChar) this.next()
-                    const rhs = this.expr(precedence + (opAssoc === 'l' ? 1 : 0))
+                    const rhs = this.expr(opPrec + (opAssoc === 'l' ? 1 : 0))
                     expr = { ty: 'op', op, lhs: expr, rhs }
                 }
             } else {

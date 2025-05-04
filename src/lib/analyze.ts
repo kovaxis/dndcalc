@@ -6,6 +6,7 @@ export interface SpellAnalysis {
     lineNum: number
     name: string
     expr: Expr
+    damage: Map<number, number>
     level: number | null
     average: number | null
     stddev: number | null
@@ -34,10 +35,14 @@ function analyzeLine(line: string, p: Params, lineNum: number): SpellAnalysis {
         const level = getLevel(expr)
         const table = compute(expr, p)
         const average = tableAverage(table)
+        const damage: Map<number, number> = new Map(table.counts.entries().map(([val, cnt]) => {
+            return [val, Number(cnt * BigInt(2 ** 53) / table.denominator) / 2 ** 53]
+        }))
         return {
             lineNum,
             name,
             expr,
+            damage,
             level: level === -1 ? null : level,
             average,
             stddev: tableStddev(table, average),
