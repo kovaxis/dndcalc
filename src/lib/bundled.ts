@@ -1,10 +1,22 @@
-export const EXAMPLE: string = `
+export interface Bundle {
+    name: string
+    source: string
+}
+
+export const EXAMPLE: Bundle = {
+    name: "Example",
+    source: `
 Magic Missile: (3 + lvl1)(1d4+1)
 Scorching Ray: lvl2[3] atk 2d6
 Fireball: area dexh lvl3[8]d6
-`.trim()
+`,
+}
 
-export const DND5E_WIZARD: string = `
+export const BUNDLES: Bundle[] = [
+    EXAMPLE,
+    {
+        name: "D&D 5e Wizard",
+        source: `
 # Level 1
 Burning Hands: area dexh lvl1[3]d6
 Catapult: dex lvl1[3]d8
@@ -48,4 +60,6 @@ Spirit Shroud: time (1+lvl3/2)d8
 Thunder Step: area conh lvl3[3]d10
 Tidal Wave: area dexh 4d8 + 0lvl3
 Vampiric Touch: atk time lvl3[3]d6
-`.trim()
+`
+    }
+]

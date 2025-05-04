@@ -1,17 +1,21 @@
 <script lang="ts">
-  import { analyze } from "./lib/analyze";
-  import { SKILLS } from "./lib/ast";
+  import { analyze } from "./engine/analyze";
+  import { SKILLS } from "./engine/ast";
   import Bar from "./lib/Bar.svelte";
+  import type { Bundle } from "./lib/bundled";
   import * as bundled from "./lib/bundled";
-  import type { Params } from "./lib/eval";
+  import type { Params } from "./engine/eval";
   import Graph from "./lib/Graph.svelte";
+  import { cmpKeyed } from "./engine/util";
+  import Help from "./lib/Help.svelte";
 
   function formatDelta(x: number): string {
-    return `${x > 0 ? "+" : ""}${x.toFixed()}`;
+    return `${x >= 0 ? "+" : ""}${x.toFixed()}`;
   }
 
   const DRAFT_KEY: string = "draft-spell-collection-source";
   const PARAMS_KEY: string = "params-state";
+  const SAVED_KEY: string = "saved-presets";
 
   interface State extends Omit<Params, "chances"> {
     spellmod: number;
@@ -39,8 +43,24 @@
     return params;
   }
 
-  let src = $state(localStorage.getItem(DRAFT_KEY) || bundled.EXAMPLE);
+  function loadSavedFromLocalStorage(): Bundle[] {
+    let saved: Bundle[] = [];
+    try {
+      const stored = localStorage.getItem(SAVED_KEY);
+      if (stored !== null) {
+        saved = JSON.parse(stored);
+      }
+    } catch (e) {
+      console.error("Error loading saved bundles from localStorage:", e);
+    }
+    return saved;
+  }
+
+  let saved = $state(loadSavedFromLocalStorage());
+
+  let src = $state(localStorage.getItem(DRAFT_KEY) || bundled.EXAMPLE.source);
   let pstate: State = $state(loadStateFromLocalStorage());
+
   let analysis = $derived(
     analyze(src, {
       ...pstate,
@@ -61,11 +81,30 @@
       ),
     }),
   );
+
+  let freezeSort = $state(false);
+  let sortOrder: Map<string, number> = $state(new Map());
+  $effect(() => {
+    if (!freezeSort) {
+      sortOrder = new Map(
+        analysis.spells.map((spell, idx) => [spell.name, idx]),
+      );
+    }
+  });
+  let spellAnalysisSorted = $derived.by(() => {
+    const sorted = [...analysis.spells];
+    sorted.sort(cmpKeyed((spell) => [sortOrder.get(spell.name) ?? -1]));
+    return sorted;
+  });
+
   $effect(() => {
     localStorage.setItem(DRAFT_KEY, src);
   });
   $effect(() => {
     localStorage.setItem(PARAMS_KEY, JSON.stringify(pstate));
+  });
+  $effect(() => {
+    localStorage.setItem(SAVED_KEY, JSON.stringify(saved));
   });
 
   const maxLevel = $derived(
@@ -85,17 +124,24 @@
     Math.ceil(Math.max(1, ...analysis.spells.map((spell) => spell.max ?? 0))),
   );
 
-  const TABLE_COLUMNS: string = "minmax(12em, 1fr) 3em 5em 5em 6em";
+  const TABLE_COLUMNS: string = "minmax(6em, 1fr) 3em 5em 5em 6em";
 
-  function gridcell(row: number, column: number) {
-    return `grid-column: ${column}; grid-row: ${row + 1}; background-color: ${row % 2 ? "#303030" : ""}`;
+  function gridcell(row: number, column: number, odd?: boolean) {
+    odd = odd ?? row % 2 !== 0;
+    return `grid-column: ${column}; grid-row: ${row + 1}; background-color: ${odd ? "#303030" : ""}`;
   }
 </script>
 
 <main class="fdown facenter" style="gap: 1cm">
-  <div class="analysis-parameters">
+  <div id="analyze" class="analysis-parameters">
     <div class="analysis">
-      <h2>Damage analysis</h2>
+      <div class="fright facenter" style="justify-content: space-between;">
+        <h2>Damage analysis</h2>
+        <label>
+          <input type="checkbox" bind:checked={freezeSort} />
+          Freeze display order
+        </label>
+      </div>
       <div
         style="
         display: grid; gap: 2px; grid-template-columns: {TABLE_COLUMNS}; grid-auto-rows: min-content;
@@ -110,10 +156,10 @@
       <div
         style="
         display: grid; gap: 2px; grid-template-columns: {TABLE_COLUMNS}; grid-auto-rows: min-content; overflow-y: scroll;
-        border: 1px solid #888; border-radius: 1em;
+        border: 1px solid #888; border-radius: 3px;
         "
       >
-        {#each analysis.spells as spell, i}
+        {#each spellAnalysisSorted as spell, i}
           <div class="cell" style={gridcell(i, 1)}>{spell.name}</div>
           <div class="cell" style={gridcell(i, 2)}>
             <Bar full={(spell.level ?? 0) / maxLevel} />
@@ -131,7 +177,7 @@
             <Bar full={(spell.stddev ?? 0) / maxStddev} />
             {spell.stddev == null ? "-" : Math.round(spell.stddev * 100) / 100}
           </div>
-          <div class="cell" style={gridcell(i, 5)}>
+          <div class="cell" style={gridcell(i, 5, true)}>
             <Graph values={spell.damage} {maxValue} />
           </div>
         {/each}
@@ -139,7 +185,10 @@
     </div>
     <div class="spacer"></div>
     <div class="parameters" style="padding-bottom: 1em;">
-      <h2>Parameters</h2>
+      <div class="fright facenter" style="justify-content: space-between;">
+        <h2>Parameters</h2>
+        <a href="#help"> Help </a>
+      </div>
       <div class="fdown facenter" style="gap: 0.5cm;">
         <div class="fright" style="gap: 1cm;">
           <div class="fdown facenter" style="gap: 0cm;">
@@ -213,9 +262,98 @@
     </div>
   </div>
 
-  <div class="fdown facenter">
+  <div id="presets" class="fdown facenter">
+    <h2>Spell presets</h2>
+    <div class="fright facenter" style="gap: 0.25cm; flex-wrap: wrap;">
+      {#each bundled.BUNDLES as bundle}
+        <button
+          class="preset-button preset-button-bg"
+          onclick={() => {
+            if (
+              !bundled.BUNDLES.concat(saved).some(
+                (someBundle) => someBundle.source.trim() === src.trim(),
+              )
+            ) {
+              const confirmed = confirm(
+                "Loading a preset will delete your current spells. Do you still want to continue?",
+              );
+              if (!confirmed) return;
+            }
+            src = bundle.source.trim();
+          }}
+        >
+          {bundle.name}
+        </button>
+      {/each}
+    </div>
+    <div class="fright facenter" style="gap: 0.25cm; flex-wrap: wrap;">
+      {#each saved as bundle, bundleIdx}
+        <div class="preset-button" style="background: none;">
+          <button
+            class="preset-button-bg"
+            style="border: none; padding-left: 1em; padding-right: 1em;"
+            onclick={() => {
+              if (
+                !bundled.BUNDLES.concat(saved).some(
+                  (someBundle) => someBundle.source.trim() === src.trim(),
+                )
+              ) {
+                const confirmed = confirm(
+                  "Loading a preset will delete your current spells. Do you still want to continue?",
+                );
+                if (!confirmed) return;
+              }
+              src = bundle.source.trim();
+            }}
+          >
+            {bundle.name}
+          </button>
+          <button
+            class="preset-button-bg"
+            style="border: none;"
+            onclick={() => {
+              const confirmed = confirm(
+                `Do you want to delete the preset "${bundle.name}"?`,
+              );
+              if (!confirmed) return;
+              saved.splice(bundleIdx, 1);
+            }}
+          >
+            🗑️
+          </button>
+        </div>
+      {/each}
+      <button
+        class="preset-button preset-button-bg"
+        style="width: 1.5em;"
+        onclick={() => {
+          const exists = bundled.BUNDLES.concat(saved).find(
+            (someBundle) => someBundle.source.trim() === src.trim(),
+          );
+          if (exists) {
+            alert(
+              `The current spell list is already saved as "${exists.name}"`,
+            );
+            return;
+          }
+          const name = prompt("How do you want to name this spell list?");
+          if (!name) return;
+          saved.push({
+            name,
+            source: src,
+          });
+        }}>+</button
+      >
+    </div>
+  </div>
+
+  <div id="spelldef" class="fdown facenter">
     <h2>Spell definitions</h2>
-    Enter your spell collection, following the example format. See help below.
+    <p style:padding="0 0.5em">
+      Enter your spell collection, following the example format. See
+      <a href="#help">help</a>
+      below.
+    </p>
     <textarea
       bind:value={src}
       style="display: block; width: min(90vw, 100vh); height: 50vh;"
@@ -228,12 +366,15 @@
     {/if}
   </div>
 
-  <div class="fdown facenter">
+  <div id="help" class="fdown facenter">
     <h2>Help</h2>
-    <ul>
-      <li>MOD: Your spell sa</li>
-    </ul>
+    <Help />
   </div>
+
+  <span style="margin-bottom: 0.5em; opacity: 0.5;">
+    Made by <a href="https://github.com/kovaxis">kovaxis</a> @ 2025.
+    <a href="https://github.com/kovaxis/dndmax">Open source</a>.
+  </span>
 </main>
 
 <style>
@@ -254,7 +395,6 @@
   .analysis {
     display: flex;
     flex-direction: column;
-    padding: 0px 1em;
     overflow: hidden;
   }
   .parameters {
@@ -294,5 +434,39 @@
     .parameters {
       flex: 0 0 auto;
     }
+  }
+
+  .preset-button {
+    appearance: none;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    margin: 0.25em;
+    height: 10em;
+    border-radius: 5px;
+    width: fit-content;
+    height: fit-content;
+    border: 1px solid #8f8f9d;
+    overflow: hidden;
+  }
+  .preset-button:hover {
+    border: 1px solid #babac6;
+  }
+  .preset-button:active {
+    border: 1px solid #dfdfe6;
+  }
+
+  .preset-button-bg {
+    font-size: 16px;
+    padding: 0.1em;
+    background: #2b2a33;
+  }
+  .preset-button-bg:hover {
+    background: #575662;
+  }
+  .preset-button-bg:active {
+    background: #757481;
   }
 </style>

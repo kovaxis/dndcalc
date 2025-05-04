@@ -44,7 +44,7 @@ function convolve(lhs: Table, rhs: Table): Table {
     }
     for (const [lval, lcnt] of lhs.counts.entries()) {
         for (const [rval, rcnt] of rhs.counts.entries()) {
-            const fval = lval + rval
+            const fval = Math.floor(lval + rval)
             out.counts.set(fval, (out.counts.get(fval) ?? BigInt(0)) + lcnt * rcnt)
         }
     }
@@ -85,16 +85,16 @@ function tableOperate(op: OpChar | OpName, lhs: Table, rhs: Table): Table {
         }
         for (const [lval, lcnt] of lhs.counts.entries()) {
             for (const [rval, rcnt] of rhs.counts.entries()) {
-                const fval = (() => {
+                const fval = Math.floor((() => {
                     switch (op) {
                         case '': case '*':
-                            return Math.floor(lval * rval)
+                            return lval * rval
                         case '+':
                             return lval + rval
                         case '-':
                             return lval - rval
                         case '/':
-                            return Math.floor(lval / rval)
+                            return lval / rval
                         case '^':
                             return lval ** rval
                         case 'max':
@@ -102,7 +102,7 @@ function tableOperate(op: OpChar | OpName, lhs: Table, rhs: Table): Table {
                         case 'min':
                             return Math.min(lval, rval)
                     }
-                })()
+                })())
                 out.counts.set(fval, (out.counts.get(fval) ?? BigInt(0)) + lcnt * rcnt)
             }
         }
