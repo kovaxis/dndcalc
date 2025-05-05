@@ -63,20 +63,9 @@ export interface Die {
     n: number
 }
 
-export interface Check {
-    ty: 'check'
-    skill: Skill
-    half: boolean
-}
-
-export interface Level {
-    ty: 'lvl'
-    level: number
-}
-
-export interface Variable {
-    ty: 'var'
-    kind: VariableKind
+export interface Name {
+    ty: 'name'
+    name: string
 }
 
 export interface Op {
@@ -92,14 +81,19 @@ export interface Unop {
     inner: Expr
 }
 
+export interface Call {
+    ty: 'call'
+    func: Expr
+    args: Expr[]
+}
+
 export type Atom =
     | Lit
     | Die
-    | Check
-    | Variable
-    | Level
+    | Name
 
 export type Expr =
     | Atom
     | Op
     | Unop
+    | Call

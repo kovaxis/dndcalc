@@ -4,7 +4,6 @@
   import Bar from "./lib/Bar.svelte";
   import type { Bundle } from "./lib/bundled";
   import * as bundled from "./lib/bundled";
-  import type { Params } from "./engine/eval";
   import Graph from "./lib/Graph.svelte";
   import { cmpKeyed } from "./engine/util";
   import Help from "./lib/Help.svelte";
@@ -17,21 +16,26 @@
   const PARAMS_KEY: string = "params-state";
   const SAVED_KEY: string = "saved-presets";
 
-  interface State extends Omit<Params, "chances"> {
-    spellmod: number;
-    skills: Params["chances"];
-  }
+  const PARAMS = [
+    "spellmod",
+    "atk",
+    "str",
+    "dex",
+    "con",
+    "int",
+    "wis",
+    "cha",
+    "area",
+    "time",
+    "lvl",
+  ] as const;
+
+  type State = Record<(typeof PARAMS)[number], number>;
 
   function loadStateFromLocalStorage(): State {
-    let params: State = {
-      spellmod: 0,
-      skills: Object.fromEntries(
-        SKILLS.map((skill) => [skill, skill === "atk" ? 10 : 0]),
-      ),
-      targets: 1,
-      time: 1,
-      level: 1,
-    };
+    let params: State = Object.fromEntries(
+      PARAMS.map((p) => [p, p === "atk" ? 10 : 0]),
+    ) as State;
     try {
       const stored = localStorage.getItem(PARAMS_KEY);
       if (stored) {
@@ -61,26 +65,7 @@
   let src = $state(localStorage.getItem(DRAFT_KEY) || bundled.EXAMPLE.source);
   let pstate: State = $state(loadStateFromLocalStorage());
 
-  let analysis = $derived(
-    analyze(src, {
-      ...pstate,
-      chances: Object.fromEntries(
-        Object.entries(pstate.skills).map(([skill, skillmod]) => {
-          // to succeed skillcheck: d20 + skillmod < 8 + spellmod
-          // d20 <= spellmod - skillmod + 7
-          // to succeed atk: d20 + spellmod >= ac
-          // d20 >= ac - spellmod
-          // 21 - d20 <= 21 + spellmod - ac
-          // d20 <= 21 - ac + spellmod
-          const lessthan =
-            skill === "atk"
-              ? 21 - skillmod + pstate.spellmod
-              : pstate.spellmod - skillmod + 7;
-          return [skill, Math.max(Math.min(lessthan, 20), 0) / 20];
-        }),
-      ),
-    }),
-  );
+  let analysis = $derived(analyze(src, new Map(Object.entries(pstate))));
 
   let freezeSort = $state(false);
   let sortOrder: Map<string, number> = $state(new Map());
@@ -195,7 +180,7 @@
             Level
             <input
               type="number"
-              bind:value={pstate.level}
+              bind:value={pstate.lvl}
               min="1"
               max="9"
               style="width: 1cm;"
@@ -205,7 +190,7 @@
             Targets
             <input
               type="number"
-              bind:value={pstate.targets}
+              bind:value={pstate.area}
               min="1"
               style="width: 1cm;"
             />
@@ -246,15 +231,13 @@
             </span>
             <input
               type="range"
-              bind:value={pstate.skills[skill]}
+              bind:value={pstate[skill]}
               min={skill === "atk" ? 10 : -10}
               max={skill === "atk" ? 30 : 10}
               step="1"
             />
             <span style="width: 50px; text-align: left;">
-              {skill === "atk"
-                ? pstate.skills[skill]
-                : formatDelta(pstate.skills[skill])}
+              {skill === "atk" ? pstate[skill] : formatDelta(pstate[skill])}
             </span>
           </div>
         {/each}

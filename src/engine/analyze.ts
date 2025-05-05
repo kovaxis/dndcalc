@@ -1,5 +1,6 @@
 import type { Expr } from "./ast"
-import { compute, getLevel, tableAverage, tableMax, tableMin, tableStddev, type Params } from "./eval"
+import { evaluate, type Params } from "./eval"
+import * as distribution from "./distribution"
 import { parse } from "./parse"
 import { cmpKeyed } from "./util"
 
@@ -33,11 +34,11 @@ function analyzeLine(line: string, p: Params, lineNum: number): SpellAnalysis {
     }
     try {
         const expr = parse(raw)
-        const level = getLevel(expr)
-        const table = compute(expr, p)
-        const average = tableAverage(table)
-        const damage: Map<number, number> = new Map(table.counts.entries().map(([val, cnt]) => {
-            return [val, Number(cnt * BigInt(2 ** 53) / table.denominator) / 2 ** 53]
+        const level = -1 // getLevel(expr) TODO: reimplement this
+        const table = evaluate(expr, p)
+        const average = distribution.average(table)
+        const damage: Map<number, number> = new Map(table.bins.entries().map(([val, cnt]) => {
+            return [val, Number(cnt * BigInt(2 ** 53) / table.total) / 2 ** 53]
         }))
         return {
             lineNum,
@@ -46,9 +47,9 @@ function analyzeLine(line: string, p: Params, lineNum: number): SpellAnalysis {
             damage,
             level: level === -1 ? null : level,
             average,
-            stddev: tableStddev(table, average),
-            min: tableMin(table),
-            max: tableMax(table),
+            stddev: distribution.stddev(table, average),
+            min: distribution.min(table),
+            max: distribution.max(table),
         }
     } catch (e) {
         console.error(e)

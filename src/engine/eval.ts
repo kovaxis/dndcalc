@@ -1,10 +1,112 @@
-import type { Expr, OpName, OpChar, Atom, UnopName } from "./ast"
+import gcd from "bigint-gcd/gcd"
+import type { Expr, OpName, OpChar, UnopName } from "./ast"
+import type { Distr } from "./distribution"
+import * as distribution from "./distribution"
 
-export interface Params {
-    chances: Record<string, number>
-    targets: number
-    time: number
-    level: number
+export type Params = Map<string, number>
+
+type Env = Map<string, Value>
+
+export interface Func {
+    ty: 'func'
+    expr: Expr
+    params: string[]
+}
+
+export interface CallCtx {
+    func: Func
+    args: Value[]
+    env: Env
+    out: Distr
+    grown: bigint
+}
+
+const STANDARD_ENV: Env = new Map(Object.entries<Value>({
+    min: { ty: 'func', params: ['a', 'b'], expr: { ty: 'op', op: 'min', lhs: { ty: 'name', name: 'a' }, rhs: { ty: 'name', name: 'b' } } }
+}))
+
+/**
+ * Any value that an expression can take: a distribution (including constant numbers) or a function.
+ */
+export type Value = Distr | Func
+
+class Context {
+    params: Params
+    globals: Env
+
+    constructor(params: Params) {
+        this.params = params
+        this.globals = new Map(STANDARD_ENV)
+        for (const [pname, pval] of params) {
+            this.globals.set(pname, distribution.singular(pval))
+        }
+    }
+
+    eval(expr: Expr, env: Env): Value {
+        switch (expr.ty) {
+            case 'die':
+                return distribution.create([...Array(expr.n)].map((_, idx) => [idx + 1, 1]))
+            case 'lit':
+                return distribution.create([[expr.lit, 1]])
+            case 'op':
+                const lhs = this.eval(expr.lhs, env)
+                const rhs = this.eval(expr.rhs, env)
+                if (lhs.ty !== 'distr' || rhs.ty !== 'distr') throw `Cannot execute operation ${lhs.ty} ${expr.op} ${rhs.ty}`
+                return binopApply(expr.op, lhs, rhs)
+            case 'unop':
+                const inner = this.eval(expr.inner, env)
+                if (inner.ty !== 'distr') throw `Cannot execute operation ${expr.op} on ${inner.ty}`
+                return unopApply(expr.op, inner)
+            case 'name':
+                const val = env.get(expr.name)
+                if (val === undefined) throw `Undefined name ${expr.name}`
+                return val
+            case 'call':
+                const func = this.eval(expr.func, env)
+                if (func.ty !== 'func') throw `Attempt to call ${func.ty}`
+                const args = expr.args.map(arg => this.eval(arg, env))
+                if (args.length < func.params.length) throw `Function expected ${func.params.length} arguments but ${args.length} were supplied`
+                const out: Distr = {
+                    ty: 'distr',
+                    bins: new Map(),
+                    total: args.reduce((prod, val) => prod * (val.ty === 'distr' ? val.total : BigInt(1)), BigInt(1)),
+                }
+                this.call({ func, args, env: new Map(env), grown: BigInt(1), out }, 0, BigInt(1))
+                return out
+        }
+    }
+
+    call(ctx: CallCtx, idx: number, weight: bigint): void {
+        if (idx >= ctx.args.length) {
+            const produced = this.eval(ctx.func.expr, ctx.env)
+            if (produced.ty !== 'distr') throw `Functions can only return numbers`
+            const g = gcd(ctx.grown, produced.total)
+            if (g !== produced.total) {
+                const by = produced.total / g
+                distribution.grow(ctx.out, by)
+                ctx.grown *= by
+            }
+            const scale = weight * ctx.grown / produced.total
+            for (const [val, cnt] of produced.bins) {
+                ctx.out.bins.set(val, (ctx.out.bins.get(val) ?? BigInt(0)) + cnt * scale)
+            }
+        } else {
+            const arg = ctx.args[idx]
+            switch (arg.ty) {
+                case 'func':
+                    ctx.env.set(ctx.func.params[idx], arg)
+                    return this.call(ctx, idx + 1, weight)
+                case 'distr':
+                    for (const [val, cnt] of arg.bins) {
+                        ctx.env.set(ctx.func.params[idx], { ty: 'distr', bins: new Map([[val, BigInt(1)]]), total: BigInt(1) })
+                        this.call(ctx, idx + 1, weight * cnt)
+                    }
+                    return
+            }
+            // This code is here to ensure that the switch handles all cases
+            return arg
+        }
+    }
 }
 
 function enter(expr: Expr, visit: (expr: Expr) => void): void {
@@ -16,16 +118,15 @@ function enter(expr: Expr, visit: (expr: Expr) => void): void {
         case 'unop':
             visit(expr.inner)
             return
-        case 'var': case 'check': case 'die': case 'lit': case 'lvl':
+        case 'call':
+            visit(expr.func)
+            for (const arg of expr.args) visit(arg)
+            return
+        case 'die': case 'lit': case 'name':
             return
         default:
             return expr
     }
-}
-
-export interface Table {
-    counts: Map<number, bigint>
-    denominator: bigint
 }
 
 function constSingleOperate(op: UnopName, inner: number): number {
@@ -37,40 +138,42 @@ function constSingleOperate(op: UnopName, inner: number): number {
     }
 }
 
-function convolve(lhs: Table, rhs: Table): Table {
-    const out: Table = {
-        counts: new Map(),
-        denominator: lhs.denominator * rhs.denominator,
+function convolve(lhs: Distr, rhs: Distr): Distr {
+    const out: Distr = {
+        ty: 'distr',
+        bins: new Map(),
+        total: lhs.total * rhs.total,
     }
-    for (const [lval, lcnt] of lhs.counts.entries()) {
-        for (const [rval, rcnt] of rhs.counts.entries()) {
+    for (const [lval, lcnt] of lhs.bins.entries()) {
+        for (const [rval, rcnt] of rhs.bins.entries()) {
             const fval = Math.floor(lval + rval)
-            out.counts.set(fval, (out.counts.get(fval) ?? BigInt(0)) + lcnt * rcnt)
+            out.bins.set(fval, (out.bins.get(fval) ?? BigInt(0)) + lcnt * rcnt)
         }
     }
     return out
 }
 
-function tableOperate(op: OpChar | OpName, lhs: Table, rhs: Table): Table {
-    if ((op === '' || op === '*') && lhs.counts.size > 0 && lhs.counts.keys().every(val => Math.floor(val) === val && val >= 0) && lhs.counts.keys().some(val => val >= 2)) {
+function binopApply(op: OpChar | OpName, lhs: Distr, rhs: Distr): Distr {
+    if ((op === '' || op === '*') && lhs.bins.size > 0 && lhs.bins.keys().every(val => Math.floor(val) === val && val >= 0) && lhs.bins.keys().some(val => val >= 2)) {
         // Multiplication with a nonnegative integral left-hand-side is special: it is iterated convolution
         console.log('convolving', lhs, 'and', rhs)
-        const upTo = Math.max(...lhs.counts.keys())
-        const out: Table = {
-            counts: new Map(),
-            denominator: lhs.denominator * rhs.denominator ** BigInt(upTo),
+        const upTo = Math.max(...lhs.bins.keys())
+        const out: Distr = {
+            ty: 'distr',
+            bins: new Map(),
+            total: lhs.total * rhs.total ** BigInt(upTo),
         }
         console.log('upTo:', upTo)
-        console.log('rhsDenom:', rhs.denominator ** BigInt(upTo))
-        console.log('finalDenom:', out.denominator)
-        let tmp = newTable([[0, 1]])
+        console.log('rhsDenom:', rhs.total ** BigInt(upTo))
+        console.log('finalDenom:', out.total)
+        let tmp = distribution.create([[0, 1]])
         for (let lval = 0; lval <= upTo; lval++) {
-            const lcnt = lhs.counts.get(lval)
+            const lcnt = lhs.bins.get(lval)
             if (lcnt !== undefined) {
                 console.log('applying lval =', lval, 'with rtmp =', tmp)
-                const rhsScaleup = rhs.denominator ** BigInt(upTo - lval)
-                for (const [rval, rcnt] of tmp.counts.entries()) {
-                    out.counts.set(rval, (out.counts.get(rval) ?? BigInt(0)) + lcnt * rhsScaleup * rcnt)
+                const rhsScaleup = rhs.total ** BigInt(upTo - lval)
+                for (const [rval, rcnt] of tmp.bins.entries()) {
+                    out.bins.set(rval, (out.bins.get(rval) ?? BigInt(0)) + lcnt * rhsScaleup * rcnt)
                 }
                 console.log('accumulated result is', out)
             }
@@ -79,12 +182,13 @@ function tableOperate(op: OpChar | OpName, lhs: Table, rhs: Table): Table {
         console.log("convolved", lhs, "and", rhs, "to obtain", out)
         return out
     } else {
-        const out: Table = {
-            counts: new Map(),
-            denominator: lhs.denominator * rhs.denominator,
+        const out: Distr = {
+            ty: 'distr',
+            bins: new Map(),
+            total: lhs.total * rhs.total,
         }
-        for (const [lval, lcnt] of lhs.counts.entries()) {
-            for (const [rval, rcnt] of rhs.counts.entries()) {
+        for (const [lval, lcnt] of lhs.bins.entries()) {
+            for (const [rval, rcnt] of rhs.bins.entries()) {
                 const fval = (() => {
                     switch (op) {
                         case '': case '*':
@@ -115,103 +219,30 @@ function tableOperate(op: OpChar | OpName, lhs: Table, rhs: Table): Table {
                             return Math.min(lval, rval)
                     }
                 })()
-                out.counts.set(fval, (out.counts.get(fval) ?? BigInt(0)) + lcnt * rcnt)
+                out.bins.set(fval, (out.bins.get(fval) ?? BigInt(0)) + lcnt * rcnt)
             }
         }
         return out
     }
 }
 
-function tableSingleOperate(op: UnopName, inner: Table): Table {
-    const out: Table = {
-        counts: new Map(),
-        denominator: inner.denominator,
+function unopApply(op: UnopName, inner: Distr): Distr {
+    const out: Distr = {
+        ty: 'distr',
+        bins: new Map(),
+        total: inner.total,
     }
-    for (const [ival, icnt] of inner.counts.entries()) {
+    for (const [ival, icnt] of inner.bins.entries()) {
         const fval = constSingleOperate(op, ival)
-        out.counts.set(fval, (out.counts.get(fval) ?? BigInt(0)) + icnt)
+        out.bins.set(fval, (out.bins.get(fval) ?? BigInt(0)) + icnt)
     }
     return out
 }
 
-function newTable(counts: Iterable<readonly [number, number]>): Table {
-    const table: Table = {
-        counts: new Map(),
-        denominator: BigInt(0),
-    }
-    for (const [val, cnt] of counts) {
-        if (cnt === 0) continue
-        table.counts.set(val, (table.counts.get(val) ?? BigInt(0)) + BigInt(cnt))
-        table.denominator += BigInt(cnt)
-    }
-    return table
-}
-
-function tableAtomEval(atom: Atom, p: Params): Table {
-    switch (atom.ty) {
-        case 'var':
-            switch (atom.kind) {
-                case 'area':
-                    return newTable([[p.targets, 1]])
-                case 'time':
-                    return newTable([[p.time, 1]])
-            }
-        case 'check':
-            const c20 = Math.round(20 * (p.chances[atom.skill] ?? 0.5))
-            return newTable([[1, c20], [atom.half ? 0.5 : 0, 20 - c20]])
-        case 'die':
-            return newTable([...Array(atom.n)].map((_, idx) => [idx + 1, 1]))
-        case 'lit':
-            return newTable([[atom.lit, 1]])
-        case 'lvl':
-            if (p.level < atom.level) return newTable([])
-            return newTable([[p.level - atom.level, 1]])
-    }
-
-}
-
-export function tableAverage(table: Table): number | null {
-    if (Number(table.denominator) === 0) return null
-    let total = BigInt(0)
-    for (const [val, cnt] of table.counts) {
-        total += BigInt(Math.round(val * 2 ** 53)) * cnt
-    }
-    return Number(total / table.denominator) / (2 ** 53)
-}
-
-export function tableStddev(table: Table, average: number | null): number | null {
-    if (average === null || Number(table.denominator) === 0) return null
-    let variance = BigInt(0)
-    for (const [val, cnt] of table.counts) {
-        variance += BigInt(Math.round((val - average) ** 2 * 2 ** 53)) * cnt
-    }
-    return Math.sqrt(Number(variance / table.denominator) / (2 ** 53))
-}
-
-export function tableMin(table: Table): number | null {
-    const min = Math.min(...table.counts.keys())
-    return min === Infinity ? null : min
-}
-
-export function tableMax(table: Table): number | null {
-    const max = Math.max(...table.counts.keys())
-    return max === -Infinity ? null : max
-}
-
-function computeFract(expr: Expr, p: Params): Table {
-    if (expr.ty === 'op') return tableOperate(expr.op, computeFract(expr.lhs, p), computeFract(expr.rhs, p))
-    else if (expr.ty === 'unop') return tableSingleOperate(expr.op, computeFract(expr.inner, p))
-    else return tableAtomEval(expr, p)
-}
-
-export function compute(expr: Expr, p: Params): Table {
-    console.log('computing expression', expr)
-    return computeFract({ ty: 'unop', op: 'floor', inner: expr }, p)
-}
-
-export function getLevel(expr: Expr): number {
-    if (expr.ty === 'lvl') return expr.level
-    let lvl = -1
-    enter(expr, (e) => lvl = Math.max(lvl, getLevel(e)))
-    return lvl
+export function evaluate(expr: Expr, p: Params): Distr {
+    console.log('evaluating expression', expr)
+    const ctx = new Context(p)
+    const result = ctx.eval(expr, ctx.globals)
+    if (result.ty !== 'distr') throw `Spell must return a number`
+    return result
 }

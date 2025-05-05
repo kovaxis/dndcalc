@@ -1,4 +1,3 @@
-- Comparison operators
 - Functions, to work with dependent random variables
 - Named functions, to reuse functionality
 - Custom parameters

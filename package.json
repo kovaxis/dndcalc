@@ -17,5 +17,8 @@
     "typescript": "~5.7.2",
     "vite": "^6.3.1",
     "vite-plugin-markdown": "^2.2.0"
+  },
+  "dependencies": {
+    "bigint-gcd": "^1.0.46"
   }
 }
