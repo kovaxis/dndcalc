@@ -16,7 +16,8 @@ export interface CallCtx {
 }
 
 const STANDARD_ENV: Env = new Map(Object.entries<Value>({
-    min: { ty: 'func', params: ['a', 'b'], body: { ty: 'op', op: 'min', lhs: { ty: 'name', name: 'a' }, rhs: { ty: 'name', name: 'b' } } }
+    min: { ty: 'func', params: ['a', 'b'], body: { ty: 'op', op: 'min', lhs: { ty: 'name', name: 'a' }, rhs: { ty: 'name', name: 'b' } } },
+    max: { ty: 'func', params: ['a', 'b'], body: { ty: 'op', op: 'max', lhs: { ty: 'name', name: 'a' }, rhs: { ty: 'name', name: 'b' } } },
 }))
 
 /**
@@ -39,6 +40,15 @@ export class Context {
         switch (expr.ty) {
             case 'die':
                 return distribution.create([...Array(expr.n)].map((_, idx) => [idx + 1, 1]))
+            case 'lvl':
+                const levelVal = env.get('level')
+                let level = null
+                if (levelVal && levelVal.ty === 'distr' && levelVal.bins.size === 1) {
+                    for (const val of levelVal.bins.keys()) {
+                        level = Math.floor(val)
+                    }
+                }
+                return distribution.singular(level == null ? 0 : Math.max(level - expr.lvl, 0))
             case 'lit':
                 return distribution.create([[expr.lit, 1]])
             case 'op':
@@ -120,7 +130,7 @@ function enter(expr: Expr, visit: (expr: Expr) => void): void {
         case 'func':
             visit(expr.body)
             return
-        case 'die': case 'lit': case 'name':
+        case 'die': case 'lit': case 'name': case 'lvl':
             return
         default:
             return expr
@@ -239,4 +249,11 @@ export function getReferences(expr: Expr): string[] {
     const out: string[] = []
     extractReferences(expr, out)
     return out
+}
+
+export function getLevel(expr: Expr): number {
+    let lvl = -1
+    if (expr.ty === 'lvl') lvl = expr.lvl
+    enter(expr, subexpr => lvl = Math.max(lvl, getLevel(subexpr)))
+    return lvl
 }

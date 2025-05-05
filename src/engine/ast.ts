@@ -69,6 +69,11 @@ export interface Die {
     n: number
 }
 
+export interface Level {
+    ty: 'lvl'
+    lvl: number
+}
+
 export interface Name {
     ty: 'name'
     name: string
@@ -96,6 +101,7 @@ export interface Call {
 export type Atom =
     | Lit
     | Die
+    | Level
     | Name
 
 export type CoreExpr = | Atom

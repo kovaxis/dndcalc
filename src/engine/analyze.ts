@@ -1,5 +1,5 @@
 import type { Expr } from "./ast"
-import { Context, getReferences, type Params } from "./eval"
+import { Context, getLevel, getReferences, type Params } from "./eval"
 import * as distribution from "./distribution"
 import { parse } from "./parse"
 import { cmpKeyed } from "./util"
@@ -166,7 +166,7 @@ function parseLine(line: string, into: Parsed, lineNum: number) {
 }
 
 export function analyzeSpell(ctx: Context, spell: ParsedSpell): SpellAnalysis {
-    const level = -1 // getLevel(expr) TODO: reimplement this
+    const level = getLevel(spell.expr)
     const result = ctx.eval(spell.expr, ctx.globals)
     if (result.ty !== 'distr') throw `Spell must return a number`
     const average = distribution.average(result)

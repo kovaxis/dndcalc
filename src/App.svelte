@@ -166,7 +166,7 @@
         <h2>Parameters</h2>
         <a href="#help"> Help </a>
       </div>
-      <div class="fdown facenter" style="gap: 0.5cm;">
+      <div class="fdown facenter" style="gap: 0.3cm;">
         {#each analysis.wantParams as group}
           {#if group.params.length > 0}
             {#if group.name}
@@ -282,7 +282,7 @@
       {/each}
       <button
         class="preset-button preset-button-bg"
-        style="width: 1.5em;"
+        style="width: 1.75em;"
         onclick={() => {
           const exists = bundled.BUNDLES.concat(saved).find(
             (someBundle) => someBundle.source.trim() === src.trim(),
@@ -399,9 +399,8 @@
     flex-direction: row;
     align-items: center;
     justify-content: center;
-    font-size: 16px;
+    font-size: 24px;
     margin: 0.25em;
-    height: 10em;
     border-radius: 5px;
     width: fit-content;
     height: fit-content;
@@ -416,8 +415,8 @@
   }
 
   .preset-button-bg {
-    font-size: 16px;
-    padding: 0.1em;
+    font-size: 24px;
+    padding: 0.25em;
     background: #2b2a33;
   }
   .preset-button-bg:hover {

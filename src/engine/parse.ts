@@ -69,9 +69,21 @@ class Parser {
             while (this.peek()?.match(/[a-zA-Z_0-9]/)) name += this.char()
             name = name.toLowerCase()
             const isDie = name.match(/^d([1-9][0-9]*)$/)
+            const isLvl = name.match(/^lvl([1-9][0-9]*)$/)
             if (isDie) {
                 const [, n] = isDie
                 return this.spanify({ ty: 'die', n: parseInt(n) }, start)
+            } else if (isLvl) {
+                const [, lvl] = isLvl
+                this.trim()
+                let expr: Expr = { ty: 'lvl', lvl: parseInt(lvl) }
+                if (this.peek() === '[') {
+                    this.char()
+                    expr = this.extend({ ty: 'op', op: '+', lhs: this.expr(), rhs: expr }, expr)
+                    const close = this.char()
+                    if (close !== ']') throw `Expected closing square bracket`
+                }
+                return expr
             } else if (name === 'fn') {
                 const params: string[] = []
                 while (true) {
