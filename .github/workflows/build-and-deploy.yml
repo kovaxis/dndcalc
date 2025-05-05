@@ -37,6 +37,8 @@ jobs:
         uses: bahmutov/npm-install@v1
       - name: Build project
         run: npm run build
+        env:
+          BASE: /dndmax/
       - name: Upload production-ready build files
         uses: actions/upload-pages-artifact@v3
         with:
