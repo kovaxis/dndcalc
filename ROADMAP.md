@@ -1,0 +1,7 @@
+- Comparison operators
+- Functions, to work with dependent random variables
+- Named functions, to reuse functionality
+- Custom parameters
+- Fix critical hits and misses
+- Effects, boolean and numeric
+    - Allow custom effect displays, and unhardcode the `Level` column.

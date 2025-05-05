@@ -96,7 +96,7 @@ In this case, `dex` is replaced by `1` if your enemy fails the saving throw, and
 - `area`: The `area` keyword is replaced by the `targets` parameter. If you multiply `area` by the rest of your spell's damage, it will multiply the damage result.
     Note that the ordering of `area` is important.
     If the spell rolls a separate die/saving throw/spell attack for each target, `area` should appear at the begginning.
-    If the spell rolls once and affects all targets equally (most spells), `area` should appear at the end.
+    If the spell rolls once and affects all targets equally, `area` should appear at the end.
 - `time`: The `time` keyword is replaced by the `turns` parameter, which allows you to multiply the damage of your spell if it deals damage over time.
     The same caveats on ordering that apply to `area` also apply to `time`.
 - `lvlN` (where `N` is a number): Replaced by `0` if the spell is cast at its lowest level, and increases by 1 for each level above it.
