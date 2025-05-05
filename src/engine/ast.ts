@@ -98,9 +98,10 @@ export type Atom =
     | Die
     | Name
 
-export type Expr =
-    | Atom
+export type CoreExpr = | Atom
     | Op
     | Unop
     | Call
     | Func
+
+export type Expr = CoreExpr & { line?: number, char?: number, span?: number }

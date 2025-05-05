@@ -24,16 +24,15 @@ const STANDARD_ENV: Env = new Map(Object.entries<Value>({
  */
 export type Value = Distr | Func
 
-class Context {
-    params: Params
+export class Context {
     globals: Env
 
-    constructor(params: Params) {
-        this.params = params
+    constructor() {
         this.globals = new Map(STANDARD_ENV)
-        for (const [pname, pval] of params) {
-            this.globals.set(pname, distribution.singular(pval))
-        }
+    }
+
+    param(name: string, value: number) {
+        this.globals.set(name, distribution.singular(value))
     }
 
     eval(expr: Expr, env: Env): Value {
@@ -238,10 +237,13 @@ function unopApply(op: UnopName, inner: Distr): Distr {
     return out
 }
 
-export function evaluate(expr: Expr, p: Params): Distr {
-    console.log('evaluating expression', expr)
-    const ctx = new Context(p)
-    const result = ctx.eval(expr, ctx.globals)
-    if (result.ty !== 'distr') throw `Spell must return a number`
-    return result
+function extractReferences(expr: Expr, out: string[]) {
+    if (expr.ty === 'name') out.push(expr.name)
+    enter(expr, subexpr => extractReferences(subexpr, out))
+}
+
+export function getReferences(expr: Expr): string[] {
+    const out: string[] = []
+    extractReferences(expr, out)
+    return out
 }

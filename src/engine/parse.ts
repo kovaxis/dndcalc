@@ -1,10 +1,16 @@
-import { OP_CHARS, type Expr, type OpChar } from "./ast"
+import { OP_CHARS, type CoreExpr, type Expr, type OpChar } from "./ast"
 
 class Parser {
+    lineNum?: number
+    startChar?: number
+
     src: string
     i: number
 
-    constructor(src: string) {
+    constructor(src: string, lineNum?: number, startChar?: number) {
+        this.lineNum = lineNum
+        this.startChar = startChar
+
         this.src = src
         this.i = 0
     }
@@ -17,7 +23,7 @@ class Parser {
 
     char(): string {
         const s = this.next()
-        if (s === undefined) throw 'Unexpected end of spell'
+        if (s === undefined) throw 'Unexpected end of line'
         return s
     }
 
@@ -29,8 +35,21 @@ class Parser {
         while (this.peek()?.match(/\s/)) this.i += 1
     }
 
+    spanify(expr: CoreExpr, start: number, end?: number): Expr {
+        if (this.lineNum == null || this.startChar == null) return expr
+        end = end ?? this.i
+        return { ...expr, line: this.lineNum, char: this.startChar + start, span: end - start }
+    }
+
+    extend(expr: CoreExpr, base: Expr, end?: number): Expr {
+        if (this.startChar == null || base.char == null) return expr
+        end = end ?? this.i
+        return { ...expr, line: base.line, char: base.char, span: this.startChar + end - base.char }
+    }
+
     atom(): Expr {
         this.trim()
+        const start = this.i
         const first = this.char()
         if (first === '(') {
             const sub = this.expr()
@@ -44,7 +63,7 @@ class Parser {
             while (this.peek()?.match(/[0-9]/)) lit += this.char()
             const num = parseFloat(lit)
             if (isNaN(num)) throw `Invalid numeric literal "${lit}"`
-            return { ty: 'lit', lit: num }
+            return this.spanify({ ty: 'lit', lit: num }, start)
         } else if (first.match(/[a-zA-Z_]/)) {
             let name = first
             while (this.peek()?.match(/[a-zA-Z_0-9]/)) name += this.char()
@@ -52,7 +71,7 @@ class Parser {
             const isDie = name.match(/^d([1-9][0-9]*)$/)
             if (isDie) {
                 const [, n] = isDie
-                return { ty: 'die', n: parseInt(n) }
+                return this.spanify({ ty: 'die', n: parseInt(n) }, start)
             } else if (name === 'fn') {
                 const params: string[] = []
                 while (true) {
@@ -66,9 +85,9 @@ class Parser {
                 const body = this.expr()
                 const close = this.char()
                 if (close !== '}') throw `Function body does not close`
-                return { ty: 'func', params, body: body }
+                return this.spanify({ ty: 'func', params, body: body }, start)
             } else {
-                return { ty: 'name', name }
+                return this.spanify({ ty: 'name', name }, start)
             }
         } else {
             throw `Unexpected character ${first}`
@@ -103,7 +122,7 @@ class Parser {
                     const close = this.next()
                     if (close !== ']') throw "Unclosed square bracket"
                 }
-                expr = { ty: 'call', func: expr, args }
+                expr = this.extend({ ty: 'call', func: expr, args }, expr)
             } else {
                 // A binary operator
                 const [opPrec, opAssoc] = OP_CHARS[op]
@@ -112,7 +131,7 @@ class Parser {
                 } else {
                     for (let i = 0; i < op.length; i++) this.next()
                     const rhs = this.expr(opPrec + (opAssoc === 'l' ? 1 : 0))
-                    expr = { ty: 'op', op, lhs: expr, rhs }
+                    expr = this.extend({ ty: 'op', op, lhs: expr, rhs }, expr)
                 }
             }
         }
@@ -120,8 +139,8 @@ class Parser {
     }
 }
 
-export function parse(raw: string): Expr {
-    const parser = new Parser(raw)
+export function parse(raw: string, lineNum?: number, startChar?: number): Expr {
+    const parser = new Parser(raw, lineNum, startChar)
     const expr = parser.expr()
     if (parser.peek() !== undefined) throw `Too many closing parenthesis`
     return expr
