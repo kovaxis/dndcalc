@@ -25,8 +25,8 @@ class Parser {
         return s
     }
 
-    peek(): string | undefined {
-        return this.src[this.i]
+    peek(far?: number): string | undefined {
+        return this.src[this.i + (far ?? 0)]
     }
 
     trim() {
@@ -41,10 +41,13 @@ class Parser {
             const close = this.next()
             if (close !== ')') throw "Unclosed parenthesis"
             return sub
-        } else if (first.match(/[0-9]/)) {
+        } else if (first.match(/[0-9.]/)) {
             let lit = first
             while (this.peek()?.match(/[0-9]/)) lit += this.char()
-            const num = parseInt(lit)
+            if (this.peek() === '.') lit += this.char()
+            while (this.peek()?.match(/[0-9]/)) lit += this.char()
+            const num = parseFloat(lit)
+            if (isNaN(num)) throw `invalid numeric literal "${lit}"`
             return { ty: 'lit', lit: num }
         } else if (first.match(/[a-zA-Z]/)) {
             let name = first
@@ -114,22 +117,28 @@ class Parser {
         }
     }
 
+    operator(): OpChar | null {
+        this.trim()
+        let bigop = this.peek()
+        if (bigop === undefined) return null
+        if (bigop.match(/[a-zA-Z0-9(]/)) return ''
+        bigop += this.peek(1) ?? ''
+        if (bigop.length >= 2 && bigop.slice(0, 2) in OP_CHARS) return bigop.slice(0, 2) as OpChar
+        else if (bigop.length >= 1 && bigop.slice(0, 1) in OP_CHARS) return bigop.slice(0, 1) as OpChar
+        else return null
+    }
+
     expr(precedence?: number): Expr {
         precedence = precedence ?? 0
         let expr: Expr = this.atom()
         while (true) {
-            this.trim()
-            let nextChar = this.peek()
-            if (nextChar?.match(/[a-zA-Z0-9(]/)) {
-                nextChar = ''
-            }
-            if (nextChar !== undefined && nextChar in OP_CHARS) {
-                const op = nextChar as OpChar
+            const op = this.operator()
+            if (op !== null) {
                 const [opPrec, opAssoc] = OP_CHARS[op as OpChar]
                 if (opPrec < precedence) {
                     break
                 } else {
-                    if (nextChar) this.next()
+                    for (let i = 0; i < op.length; i++) this.next()
                     const rhs = this.expr(opPrec + (opAssoc === 'l' ? 1 : 0))
                     expr = { ty: 'op', op, lhs: expr, rhs }
                 }

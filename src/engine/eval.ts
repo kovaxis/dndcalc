@@ -85,24 +85,36 @@ function tableOperate(op: OpChar | OpName, lhs: Table, rhs: Table): Table {
         }
         for (const [lval, lcnt] of lhs.counts.entries()) {
             for (const [rval, rcnt] of rhs.counts.entries()) {
-                const fval = Math.floor((() => {
+                const fval = (() => {
                     switch (op) {
                         case '': case '*':
-                            return lval * rval
+                            return Math.floor(lval * rval)
                         case '+':
                             return lval + rval
                         case '-':
                             return lval - rval
                         case '/':
-                            return lval / rval
+                            return Math.floor(lval / rval)
                         case '^':
                             return lval ** rval
+                        case '<':
+                            return lval < rval ? 1 : 0
+                        case '>':
+                            return lval > rval ? 1 : 0
+                        case '<=':
+                            return lval <= rval ? 1 : 0
+                        case '>=':
+                            return lval >= rval ? 1 : 0
+                        case '!=':
+                            return lval !== rval ? 1 : 0
+                        case '==':
+                            return lval === rval ? 1 : 0
                         case 'max':
                             return Math.max(lval, rval)
                         case 'min':
                             return Math.min(lval, rval)
                     }
-                })())
+                })()
                 out.counts.set(fval, (out.counts.get(fval) ?? BigInt(0)) + lcnt * rcnt)
             }
         }

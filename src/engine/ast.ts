@@ -1,16 +1,21 @@
 
 
 export const OP_CHARS = {
-    '+': [0, 'l'],
-    '-': [0, 'l'],
+    '<': [9, 'l'],
+    '>': [9, 'l'],
+    '<=': [9, 'l'],
+    '>=': [9, 'l'],
+    '==': [9, 'l'],
+    '!=': [9, 'l'],
+    '+': [10, 'l'],
+    '-': [10, 'l'],
     // empty spaces are equivalent to *
     // multiplication is right-associative, because multiplication is actually convolution
-    '': [1, 'r'],
-    '*': [1, 'r'],
+    '': [11, 'r'],
+    '*': [11, 'r'],
     // division has higher precedence than multiplication, to preserve conventions
-    // i am 99% percent sure that making division higher precedence than multiplication and left-to-right makes operations with constant numbers behave the same as standard arithmetic
-    '/': [2, 'l'],
-    '^': [3, 'r'],
+    '/': [12, 'l'],
+    '^': [13, 'r'],
 } as const
 
 export type OpChar = keyof typeof OP_CHARS
