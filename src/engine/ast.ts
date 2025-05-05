@@ -58,6 +58,12 @@ export interface Lit {
     lit: number
 }
 
+export interface Func {
+    ty: 'func'
+    params: string[]
+    body: Expr
+}
+
 export interface Die {
     ty: 'die'
     n: number
@@ -97,3 +103,4 @@ export type Expr =
     | Op
     | Unop
     | Call
+    | Func

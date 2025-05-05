@@ -1,17 +1,11 @@
 import gcd from "bigint-gcd/gcd"
-import type { Expr, OpName, OpChar, UnopName } from "./ast"
+import type { Expr, OpName, OpChar, UnopName, Func } from "./ast"
 import type { Distr } from "./distribution"
 import * as distribution from "./distribution"
 
 export type Params = Map<string, number>
 
 type Env = Map<string, Value>
-
-export interface Func {
-    ty: 'func'
-    expr: Expr
-    params: string[]
-}
 
 export interface CallCtx {
     func: Func
@@ -22,7 +16,7 @@ export interface CallCtx {
 }
 
 const STANDARD_ENV: Env = new Map(Object.entries<Value>({
-    min: { ty: 'func', params: ['a', 'b'], expr: { ty: 'op', op: 'min', lhs: { ty: 'name', name: 'a' }, rhs: { ty: 'name', name: 'b' } } }
+    min: { ty: 'func', params: ['a', 'b'], body: { ty: 'op', op: 'min', lhs: { ty: 'name', name: 'a' }, rhs: { ty: 'name', name: 'b' } } }
 }))
 
 /**
@@ -61,6 +55,8 @@ class Context {
                 const val = env.get(expr.name)
                 if (val === undefined) throw `Undefined name ${expr.name}`
                 return val
+            case 'func':
+                return expr
             case 'call':
                 const func = this.eval(expr.func, env)
                 if (func.ty !== 'func') throw `Attempt to call ${func.ty}`
@@ -78,7 +74,7 @@ class Context {
 
     call(ctx: CallCtx, idx: number, weight: bigint): void {
         if (idx >= ctx.args.length) {
-            const produced = this.eval(ctx.func.expr, ctx.env)
+            const produced = this.eval(ctx.func.body, ctx.env)
             if (produced.ty !== 'distr') throw `Functions can only return numbers`
             const g = gcd(ctx.grown, produced.total)
             if (g !== produced.total) {
@@ -121,6 +117,9 @@ function enter(expr: Expr, visit: (expr: Expr) => void): void {
         case 'call':
             visit(expr.func)
             for (const arg of expr.args) visit(arg)
+            return
+        case 'func':
+            visit(expr.body)
             return
         case 'die': case 'lit': case 'name':
             return

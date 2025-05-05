@@ -53,6 +53,20 @@ class Parser {
             if (isDie) {
                 const [, n] = isDie
                 return { ty: 'die', n: parseInt(n) }
+            } else if (name === 'fn') {
+                const params: string[] = []
+                while (true) {
+                    this.trim()
+                    let name = this.next()
+                    if (name === '{') break
+                    if (!name?.match(/[a-zA-Z_]/)) throw "Expected function parameters"
+                    while (this.peek()?.match(/[a-zA-Z_0-9]/)) name += this.char()
+                    params.push(name)
+                }
+                const body = this.expr()
+                const close = this.char()
+                if (close !== '}') throw `Function body does not close`
+                return { ty: 'func', params, body: body }
             } else {
                 return { ty: 'name', name }
             }
