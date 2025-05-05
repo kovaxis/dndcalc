@@ -1,4 +1,4 @@
-# DndMax
+# DndCalc
 
 Calculate the damage output for your Dungeons & Dragons 5e spells.
 
