@@ -26,11 +26,13 @@ export interface DefinedParam {
     id: string
     humanName: string
     default: number
+    attribs: ParamAttribs
 }
 
 export interface DefinedParamGroup {
     name: string
     params: DefinedParam[]
+    attribs: GroupAttribs
 }
 
 export interface ParsedSpell {
@@ -42,18 +44,83 @@ interface Parsed {
     spells: ParsedSpell[]
     defs: Record<string, Expr>
     definedParams: DefinedParamGroup[]
-    lastGroup: string
 }
 
 function isDefined(parsed: Parsed, name: string): boolean {
     return name in parsed.defs || parsed.definedParams.find(group => group.params.find(param => param.id === name)) != null
 }
 
+type AttribModel = Record<string, (raw?: string) => unknown>
+
+function enumAttrib<T>(name: string, values: T[]): (raw?: string) => unknown {
+    return (raw?: string) => {
+        if (raw === undefined) return values[0]
+        for (const val of values) {
+            if (raw === val) return val
+        }
+        throw `Invalid attribute ${name} "${raw}", expected one of ${values.join(', ')}`
+    }
+}
+
+function intAttrib(name: string, dfault?: number): (raw?: string) => unknown {
+    return (raw?: string) => {
+        if (raw === undefined && dfault != null) return dfault
+        if (raw !== undefined) {
+            const x = parseInt(raw)
+            if (!isNaN(x)) return x
+        }
+        throw `Invalid attribute ${name} "${raw}", expected an integer`
+    }
+}
+
+interface GroupAttribs {
+    flow: 'column' | 'row'
+}
+
+const GROUP_ATTRIBS: AttribModel = {
+    flow: enumAttrib("flow", ['column', 'row']),
+}
+
+interface ParamAttribs {
+    type: 'number' | 'range'
+    min: number
+    max: number
+    step: number
+}
+
+const PARAM_ATTRIBS: AttribModel = {
+    type: enumAttrib("type", ['number', 'range']),
+    min: intAttrib("min", -20),
+    max: intAttrib("max", 20),
+    step: intAttrib("step", 1),
+}
+
+function parseAttribs<T>(raw: string, model: AttribModel): T {
+    const amorphous: Record<string, string> = {}
+    for (const [, attrib] of raw.matchAll(/\[([^\]]*)\]/g)) {
+        console.log(attrib)
+        const pair = attrib.match(/^\s*([^=\s]+)\s*(?:=\s*([^= ]+))?\s*$/)
+        if (!pair) throw `Invalid attribute syntax "${attrib}"`
+        const key = pair[1]
+        const val = pair[2]
+        amorphous[key] = val ?? ''
+    }
+    console.log(amorphous)
+    for (const key of Object.keys(amorphous)) {
+        if (!(key in model)) {
+            throw `Unknown attribute "${key}"`
+        }
+    }
+    return Object.fromEntries(Object.entries(model).map(([key, validate]) => {
+        return [key, validate(amorphous[key])]
+    })) as T
+}
+
 function parseLine(line: string, into: Parsed, lineNum: number) {
     const isSpell = /^\s*([^:]*?)\s*\:(.*)$/.exec(line)
-    const isDef = /^\s*([a-zA-Z_][a-zA-Z_0-9]*)\s*=\s*(.*?)\s*$/.exec(line)
-    const isGroup = /^\s*\[\s*([^\]]*?)\s*\]\s*$/.exec(line)
-    const isParam = /^\s*([a-zA-Z_][a-zA-Z_0-9]*)\s*\?\s*(.*?)\s*(?:=\s*([0-9]*)\s)*$/.exec(line)
+    const isDef = /^\s*define\s+([a-zA-Z_][a-zA-Z_0-9]*)\s*=\s*(.*?)\s*$/.exec(line)
+    const isGroup = /^\s*group(?:\s*\[([^\]]*)\]|\s+)\s*(.*?)\s*$/.exec(line)
+    const isParam = /^\s*parameter(\s*(?:\[[^\]]*\])+\s*|\s+)([a-zA-Z_][a-zA-Z_0-9]*)\s*\?\s*([^=]*?)\s*(?:=\s*([0-9]*)\s*)?$/.exec(line)
     let name = null
     try {
         if (isSpell) {
@@ -70,27 +137,23 @@ function parseLine(line: string, into: Parsed, lineNum: number) {
             const expr = parse(raw)
             into.defs[name] = expr
         } else if (isGroup) {
-            name = isGroup[1]
-            into.lastGroup = name
+            name = isGroup[2]
+            const attribs = parseAttribs<GroupAttribs>(isGroup[1], GROUP_ATTRIBS)
+            into.definedParams.push({ name, attribs, params: [] })
         } else if (isParam) {
-            name = isParam[1]
-            const human = isParam[2]
-            const dfault = isParam[3]
+            console.log(isParam)
+            name = isParam[2]
+            const attribs = parseAttribs<ParamAttribs>(isParam[1], PARAM_ATTRIBS)
+            const human = isParam[3]
+            const dfault = isParam[4]
             if (!name || !human) throw `Parameter name cannot be empty`
             if (!dfault) throw `Supply a default for parameter ${name}`
             if (isDefined(into, name)) throw `Duplicate definition of ${name}`
-            let group = into.definedParams.find(g => g.name === into.lastGroup)
-            if (group === undefined) {
-                group = {
-                    name,
-                    params: [],
-                }
-                into.definedParams.push(group)
-            }
-            group.params.push({
+            into.definedParams[into.definedParams.length - 1].params.push({
                 id: name,
                 humanName: human,
                 default: parseInt(dfault),
+                attribs,
             })
         } else {
             throw `Invalid syntax`
@@ -158,7 +221,7 @@ export function analyze(source: string, p: Params): CollectionAnalysis {
     }
 
     // Parse the source
-    const parsed: Parsed = { definedParams: [], defs: {}, lastGroup: '', spells: [] }
+    const parsed: Parsed = { definedParams: [{ name: '', attribs: parseAttribs("", GROUP_ATTRIBS), params: [] }], defs: {}, spells: [] }
     source.split('\n').flatMap((line, idx) => {
         const commentStart = line.indexOf('#')
         if (commentStart !== -1) line = line.slice(0, commentStart)

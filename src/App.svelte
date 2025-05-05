@@ -1,6 +1,5 @@
 <script lang="ts">
   import { analyze } from "./engine/analyze";
-  import { SKILLS } from "./engine/ast";
   import Bar from "./lib/Bar.svelte";
   import type { Bundle } from "./lib/bundled";
   import * as bundled from "./lib/bundled";
@@ -16,26 +15,10 @@
   const PARAMS_KEY: string = "params-state";
   const SAVED_KEY: string = "saved-presets";
 
-  const PARAMS = [
-    "spellmod",
-    "atk",
-    "str",
-    "dex",
-    "con",
-    "int",
-    "wis",
-    "cha",
-    "area",
-    "time",
-    "lvl",
-  ] as const;
+  type ParamState = Record<string, number>;
 
-  type State = Record<(typeof PARAMS)[number], number>;
-
-  function loadStateFromLocalStorage(): State {
-    let params: State = Object.fromEntries(
-      PARAMS.map((p) => [p, p === "atk" ? 10 : 0]),
-    ) as State;
+  function loadStateFromLocalStorage(): ParamState {
+    let params: ParamState = {};
     try {
       const stored = localStorage.getItem(PARAMS_KEY);
       if (stored) {
@@ -63,9 +46,17 @@
   let saved = $state(loadSavedFromLocalStorage());
 
   let src = $state(localStorage.getItem(DRAFT_KEY) || bundled.EXAMPLE.source);
-  let pstate: State = $state(loadStateFromLocalStorage());
+  let pstate: ParamState = $state(loadStateFromLocalStorage());
 
   let analysis = $derived(analyze(src, new Map(Object.entries(pstate))));
+
+  $effect(() => {
+    for (const group of analysis.wantParams) {
+      for (const param of group.params) {
+        if (!(param.id in pstate)) pstate[param.id] = param.default;
+      }
+    }
+  });
 
   let freezeSort = $state(false);
   let sortOrder: Map<string, number> = $state(new Map());
@@ -175,70 +166,44 @@
         <a href="#help"> Help </a>
       </div>
       <div class="fdown facenter" style="gap: 0.5cm;">
-        <div class="fright" style="gap: 1cm;">
-          <div class="fdown facenter" style="gap: 0cm;">
-            Level
-            <input
-              type="number"
-              bind:value={pstate.lvl}
-              min="1"
-              max="9"
-              style="width: 1cm;"
-            />
-          </div>
-          <div class="fdown facenter" style="gap: 0cm;">
-            Targets
-            <input
-              type="number"
-              bind:value={pstate.area}
-              min="1"
-              style="width: 1cm;"
-            />
-          </div>
-          <div class="fdown facenter" style="gap: 0cm;">
-            Turns
-            <input
-              type="number"
-              bind:value={pstate.time}
-              min="1"
-              style="width: 1cm;"
-            />
-          </div>
-        </div>
-        <div class="fdown facenter">
-          Your attributes:
-          <div class="fright" style="gap: 0.2cm">
-            <span style="width: 6em; text-align: right;">Spell mod</span>
-            <input
-              type="range"
-              bind:value={pstate.spellmod}
-              min="-10"
-              max="10"
-              step="1"
-            />
-            <span style="width: 50px; text-align: left;">
-              {formatDelta(pstate.spellmod)}
-            </span>
-          </div>
-        </div>
-      </div>
-      <div class="fdown facenter">
-        Enemy attributes:
-        {#each SKILLS as skill}
-          <div class="fright" style="gap: 0.2cm;">
-            <span style="width: 6em; text-align: right;">
-              {skill === "atk" ? "AC" : `${skill.toUpperCase()} save`}
-            </span>
-            <input
-              type="range"
-              bind:value={pstate[skill]}
-              min={skill === "atk" ? 10 : -10}
-              max={skill === "atk" ? 30 : 10}
-              step="1"
-            />
-            <span style="width: 50px; text-align: left;">
-              {skill === "atk" ? pstate[skill] : formatDelta(pstate[skill])}
-            </span>
+        {#each analysis.wantParams as group}
+          <div
+            class="{group.attribs.flow === 'column'
+              ? 'fdown'
+              : 'fright'} facenter"
+            style="gap: 1cm;"
+          >
+            {group.name}
+            {#each group.params as param}
+              {#if param.attribs.type === "number"}
+                <div class="fdown facenter" style="gap: 0cm;">
+                  {param.humanName}
+                  <input
+                    type={param.attribs.type}
+                    bind:value={pstate[param.id]}
+                    min={param.attribs.min}
+                    max={param.attribs.max}
+                    step={param.attribs.step}
+                    style="width: 1cm;"
+                  />
+                </div>
+              {/if}
+              {#if param.attribs.type === "range"}
+                <div class="fright" style="gap: 0.2cm">
+                  <span style="width: 6em; text-align: right;">Spell mod</span>
+                  <input
+                    type="range"
+                    bind:value={pstate.spellmod}
+                    min={param.attribs.min}
+                    max={param.attribs.max}
+                    step={param.attribs.step}
+                  />
+                  <span style="width: 50px; text-align: left;">
+                    {formatDelta(pstate.spellmod)}
+                  </span>
+                </div>
+              {/if}
+            {/each}
           </div>
         {/each}
       </div>

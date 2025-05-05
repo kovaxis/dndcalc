@@ -1,4 +1,3 @@
-- Custom parameters
 - Fix critical hits and misses
 - Effects, boolean and numeric
     - Allow custom effect displays, and unhardcode the `Level` column.

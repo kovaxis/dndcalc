@@ -154,30 +154,23 @@ function convolve(lhs: Distr, rhs: Distr): Distr {
 function binopApply(op: OpChar | OpName, lhs: Distr, rhs: Distr): Distr {
     if ((op === '' || op === '*') && lhs.bins.size > 0 && lhs.bins.keys().every(val => Math.floor(val) === val && val >= 0) && lhs.bins.keys().some(val => val >= 2)) {
         // Multiplication with a nonnegative integral left-hand-side is special: it is iterated convolution
-        console.log('convolving', lhs, 'and', rhs)
         const upTo = Math.max(...lhs.bins.keys())
         const out: Distr = {
             ty: 'distr',
             bins: new Map(),
             total: lhs.total * rhs.total ** BigInt(upTo),
         }
-        console.log('upTo:', upTo)
-        console.log('rhsDenom:', rhs.total ** BigInt(upTo))
-        console.log('finalDenom:', out.total)
         let tmp = distribution.create([[0, 1]])
         for (let lval = 0; lval <= upTo; lval++) {
             const lcnt = lhs.bins.get(lval)
             if (lcnt !== undefined) {
-                console.log('applying lval =', lval, 'with rtmp =', tmp)
                 const rhsScaleup = rhs.total ** BigInt(upTo - lval)
                 for (const [rval, rcnt] of tmp.bins.entries()) {
                     out.bins.set(rval, (out.bins.get(rval) ?? BigInt(0)) + lcnt * rhsScaleup * rcnt)
                 }
-                console.log('accumulated result is', out)
             }
             if (lval < upTo) tmp = convolve(tmp, rhs)
         }
-        console.log("convolved", lhs, "and", rhs, "to obtain", out)
         return out
     } else {
         const out: Distr = {
