@@ -58,7 +58,7 @@ export class Context {
                 return expr
             case 'call':
                 const func = this.eval(expr.func, env)
-                if (func.ty !== 'func') throw `Attempt to call ${func.ty}`
+                if (func.ty !== 'func') throw `Attempt to call non-function`
                 const args = expr.args.map(arg => this.eval(arg, env))
                 if (args.length < func.params.length) throw `Function expected ${func.params.length} arguments but ${args.length} were supplied`
                 const out: Distr = {

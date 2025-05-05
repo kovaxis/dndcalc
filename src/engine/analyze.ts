@@ -89,7 +89,7 @@ interface ParamAttribs {
 }
 
 const PARAM_ATTRIBS: AttribModel = {
-    type: enumAttrib("type", ['number', 'range']),
+    type: enumAttrib("type", ['range', 'number']),
     min: intAttrib("min", -20),
     max: intAttrib("max", 20),
     step: intAttrib("step", 1),
@@ -98,14 +98,12 @@ const PARAM_ATTRIBS: AttribModel = {
 function parseAttribs<T>(raw: string, model: AttribModel): T {
     const amorphous: Record<string, string> = {}
     for (const [, attrib] of raw.matchAll(/\[([^\]]*)\]/g)) {
-        console.log(attrib)
         const pair = attrib.match(/^\s*([^=\s]+)\s*(?:=\s*([^= ]+))?\s*$/)
         if (!pair) throw `Invalid attribute syntax "${attrib}"`
         const key = pair[1]
         const val = pair[2]
         amorphous[key] = val ?? ''
     }
-    console.log(amorphous)
     for (const key of Object.keys(amorphous)) {
         if (!(key in model)) {
             throw `Unknown attribute "${key}"`
@@ -119,7 +117,7 @@ function parseAttribs<T>(raw: string, model: AttribModel): T {
 function parseLine(line: string, into: Parsed, lineNum: number) {
     const isSpell = /^\s*([^:]*?)\s*\:(.*)$/.exec(line)
     const isDef = /^\s*define\s+([a-zA-Z_][a-zA-Z_0-9]*)\s*=\s*(.*?)\s*$/.exec(line)
-    const isGroup = /^\s*group(?:\s*\[([^\]]*)\]|\s+)\s*(.*?)\s*$/.exec(line)
+    const isGroup = /^\s*group(\s*(?:\[[^\]]*\])+\s*|\s+)\s*(.*?)\s*$/.exec(line)
     const isParam = /^\s*parameter(\s*(?:\[[^\]]*\])+\s*|\s+)([a-zA-Z_][a-zA-Z_0-9]*)\s*\?\s*([^=]*?)\s*(?:=\s*([0-9]*)\s*)?$/.exec(line)
     let name = null
     try {
@@ -138,12 +136,11 @@ function parseLine(line: string, into: Parsed, lineNum: number) {
             into.defs[name] = expr
         } else if (isGroup) {
             name = isGroup[2]
-            const attribs = parseAttribs<GroupAttribs>(isGroup[1], GROUP_ATTRIBS)
+            const attribs = parseAttribs<GroupAttribs>(isGroup[1] ?? '', GROUP_ATTRIBS)
             into.definedParams.push({ name, attribs, params: [] })
         } else if (isParam) {
-            console.log(isParam)
             name = isParam[2]
-            const attribs = parseAttribs<ParamAttribs>(isParam[1], PARAM_ATTRIBS)
+            const attribs = parseAttribs<ParamAttribs>(isParam[1] ?? '', PARAM_ATTRIBS)
             const human = isParam[3]
             const dfault = isParam[4]
             if (!name || !human) throw `Parameter name cannot be empty`

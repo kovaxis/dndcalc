@@ -49,6 +49,7 @@
   let pstate: ParamState = $state(loadStateFromLocalStorage());
 
   let analysis = $derived(analyze(src, new Map(Object.entries(pstate))));
+  $inspect(analysis);
 
   $effect(() => {
     for (const group of analysis.wantParams) {
@@ -167,44 +168,52 @@
       </div>
       <div class="fdown facenter" style="gap: 0.5cm;">
         {#each analysis.wantParams as group}
-          <div
-            class="{group.attribs.flow === 'column'
-              ? 'fdown'
-              : 'fright'} facenter"
-            style="gap: 1cm;"
-          >
-            {group.name}
-            {#each group.params as param}
-              {#if param.attribs.type === "number"}
-                <div class="fdown facenter" style="gap: 0cm;">
-                  {param.humanName}
-                  <input
-                    type={param.attribs.type}
-                    bind:value={pstate[param.id]}
-                    min={param.attribs.min}
-                    max={param.attribs.max}
-                    step={param.attribs.step}
-                    style="width: 1cm;"
-                  />
-                </div>
-              {/if}
-              {#if param.attribs.type === "range"}
-                <div class="fright" style="gap: 0.2cm">
-                  <span style="width: 6em; text-align: right;">Spell mod</span>
-                  <input
-                    type="range"
-                    bind:value={pstate.spellmod}
-                    min={param.attribs.min}
-                    max={param.attribs.max}
-                    step={param.attribs.step}
-                  />
-                  <span style="width: 50px; text-align: left;">
-                    {formatDelta(pstate.spellmod)}
-                  </span>
-                </div>
-              {/if}
-            {/each}
-          </div>
+          {#if group.params.length > 0}
+            {#if group.name}
+              <span style="margin: 0px;">{group.name}:</span>
+            {/if}
+            <div
+              class="{group.attribs.flow === 'column'
+                ? 'fdown'
+                : 'fright'} facenter"
+              style="gap: {group.attribs.flow === 'column' ? '0cm' : '1cm'};"
+            >
+              {#each group.params as param}
+                {#if param.attribs.type === "number"}
+                  <div class="fdown facenter" style="gap: 0cm;">
+                    {param.humanName}
+                    <input
+                      type={param.attribs.type}
+                      bind:value={pstate[param.id]}
+                      min={param.attribs.min}
+                      max={param.attribs.max}
+                      step={param.attribs.step}
+                      style="width: 1cm;"
+                    />
+                  </div>
+                {/if}
+                {#if param.attribs.type === "range"}
+                  <div class="fright" style="gap: 0.2cm">
+                    <span style="width: 6em; text-align: right;"
+                      >{param.humanName}</span
+                    >
+                    <input
+                      type="range"
+                      bind:value={pstate[param.id]}
+                      min={param.attribs.min}
+                      max={param.attribs.max}
+                      step={param.attribs.step}
+                    />
+                    <span style="width: 50px; text-align: left;">
+                      {param.attribs.min < 0
+                        ? formatDelta(pstate[param.id])
+                        : pstate[param.id]}
+                    </span>
+                  </div>
+                {/if}
+              {/each}
+            </div>
+          {/if}
         {/each}
       </div>
     </div>
