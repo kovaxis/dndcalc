@@ -84,6 +84,7 @@ Chromatic Orb: atk lvl1[3]d8
 Earth Tremor: area dex lvl1[1]d6
 Frost Fingers: area conh lvl1[2]d8
 Ice Knife: atk 1d10 + area dex lvl1[2]d6
+Jim's Magic Missile: max[0][ lvl1[3] fn roll { (roll == 20) 3d4 + max[roll + spellmod >= ac][roll == 20] 2d4 - (roll == 1) 10000 }[d20] ]
 Magic Missile: (3 + lvl1)(1d4+1)
 Ray of Sickness: atk lvl1[2]d8
 Tasha's Caustic Brew: area time dex (2+2*lvl1)d4
@@ -125,8 +126,8 @@ Vampiric Touch: atk time lvl3[3]d6
 # Parameters
 
 group[flow=row]
-parameter[type=number][min=1][max=9] level ? Level = 1
-parameter[type=number][min=1] area ? Targets = 1
+parameter[type=number][min=1][max=9] level ? Slot level = 1
+parameter[type=number][min=1] area ? Area targets = 1
 parameter[type=number][min=1] time ? Turns = 1
 
 group Your attributes
