@@ -18,12 +18,18 @@ export const OP_CHARS = {
     '^': [13, 'r'],
 } as const
 
+export const UNOP_CHARS = {
+    '-': 10,
+} as const
+
 export type OpChar = keyof typeof OP_CHARS
 
 export const OP_NAMES = [
     'max',
     'min',
 ] as const
+
+export type UnopChar = keyof typeof UNOP_CHARS
 
 export type OpName = typeof OP_NAMES[number]
 
@@ -88,7 +94,7 @@ export interface Op {
 
 export interface Unop {
     ty: 'unop'
-    op: UnopName
+    op: UnopChar | UnopName
     inner: Expr
 }
 

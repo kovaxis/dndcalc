@@ -1,5 +1,5 @@
 import gcd from "bigint-gcd/gcd"
-import type { Expr, OpName, OpChar, UnopName, Func } from "./ast"
+import type { Expr, OpName, OpChar, UnopName, Func, UnopChar } from "./ast"
 import type { Distr } from "./distribution"
 import * as distribution from "./distribution"
 
@@ -147,8 +147,10 @@ function enter(expr: Expr, visit: (expr: Expr) => void): void {
     }
 }
 
-function constSingleOperate(op: UnopName, inner: number): number {
+function constSingleOperate(op: UnopChar | UnopName, inner: number): number {
     switch (op) {
+        case '-':
+            return -inner
         case 'floor':
             return Math.floor(inner)
         case 'ceil':
@@ -237,7 +239,7 @@ function binopApply(op: OpChar | OpName, lhs: Distr, rhs: Distr): Distr {
     }
 }
 
-function unopApply(op: UnopName, inner: Distr): Distr {
+function unopApply(op: UnopChar | UnopName, inner: Distr): Distr {
     const out: Distr = {
         ty: 'distr',
         bins: new Map(),

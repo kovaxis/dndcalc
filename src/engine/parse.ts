@@ -1,4 +1,4 @@
-import { OP_CHARS, type CoreExpr, type Expr, type OpChar } from "./ast"
+import { OP_CHARS, UNOP_CHARS, type CoreExpr, type Expr, type OpChar, type UnopChar } from "./ast"
 
 class Parser {
     lineNum?: number
@@ -56,6 +56,10 @@ class Parser {
             const close = this.next()
             if (close !== ')') throw "Unclosed parenthesis"
             return sub
+        } else if (first in UNOP_CHARS) {
+            const unop = first as UnopChar
+            const inner = this.expr(UNOP_CHARS[unop] + 1)
+            return this.spanify({ ty: 'unop', op: unop, inner }, start)
         } else if (first.match(/[0-9.]/)) {
             let lit = first
             while (this.peek()?.match(/[0-9]/)) lit += this.char()
