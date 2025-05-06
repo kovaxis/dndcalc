@@ -14,39 +14,40 @@
   const DRAFT_KEY: string = "draft-spell-collection-source";
   const PARAMS_KEY: string = "params-state";
   const SAVED_KEY: string = "saved-presets";
+  const TOUCHED_KEY: string = "touched-features";
 
   type ParamState = Record<string, number>;
 
-  function loadStateFromLocalStorage(): ParamState {
-    let params: ParamState = {};
+  function loadFromLocalStorage<T>(key: string, dfault: T, name: string): T {
+    let something: T = dfault;
     try {
-      const stored = localStorage.getItem(PARAMS_KEY);
+      const stored = localStorage.getItem(key);
       if (stored) {
-        params = JSON.parse(stored);
+        something = JSON.parse(stored);
       }
     } catch (e) {
-      console.error("Error loading state from localStorage:", e);
+      console.error(`Error loading ${name} from localStorage:`, e);
     }
-    return params;
+    return something;
   }
 
-  function loadSavedFromLocalStorage(): Bundle[] {
-    let saved: Bundle[] = [];
-    try {
-      const stored = localStorage.getItem(SAVED_KEY);
-      if (stored !== null) {
-        saved = JSON.parse(stored);
-      }
-    } catch (e) {
-      console.error("Error loading saved bundles from localStorage:", e);
-    }
-    return saved;
-  }
+  let saved = $state(
+    loadFromLocalStorage<Bundle[]>(SAVED_KEY, [], "saved bundles"),
+  );
+  let touched = $state(
+    loadFromLocalStorage<Record<string, boolean>>(
+      TOUCHED_KEY,
+      {},
+      "touched features",
+    ),
+  );
 
-  let saved = $state(loadSavedFromLocalStorage());
-
-  let src = $state(localStorage.getItem(DRAFT_KEY) || bundled.EXAMPLE.source);
-  let pstate: ParamState = $state(loadStateFromLocalStorage());
+  let src = $state(
+    localStorage.getItem(DRAFT_KEY) || bundled.EXAMPLE.source.trim(),
+  );
+  let pstate: ParamState = $state(
+    loadFromLocalStorage(PARAMS_KEY, {}, "parameter state"),
+  );
 
   let analysis = $derived(analyze(src, new Map(Object.entries(pstate))));
   $inspect(analysis);
@@ -83,6 +84,9 @@
   $effect(() => {
     localStorage.setItem(SAVED_KEY, JSON.stringify(saved));
   });
+  $effect(() => {
+    localStorage.setItem(TOUCHED_KEY, JSON.stringify(touched));
+  });
 
   const maxLevel = $derived(
     Math.max(1, ...analysis.spells.map((spell) => spell.level ?? 0)),
@@ -101,7 +105,7 @@
     Math.ceil(Math.max(1, ...analysis.spells.map((spell) => spell.max ?? 0))),
   );
 
-  const TABLE_COLUMNS: string = "minmax(6em, 1fr) 3em 5em 5em 6em";
+  const TABLE_COLUMNS: string = "minmax(6em, 1fr) 2.5em 3.5em 3.5em 6em";
 
   function gridcell(row: number, column: number, odd?: boolean) {
     odd = odd ?? row % 2 !== 0;
@@ -125,9 +129,9 @@
         "
       >
         <div class="cell">Spell</div>
-        <div class="cell">Level</div>
-        <div class="cell">Average</div>
-        <div class="cell">Deviation</div>
+        <div class="cell">Lvl</div>
+        <div class="cell">Avg</div>
+        <div class="cell">Dev</div>
         <div class="cell">Distribution</div>
       </div>
       <div
@@ -146,13 +150,11 @@
           </div>
           <div class="cell" style={gridcell(i, 3)}>
             <Bar full={(spell.average ?? 0) / maxAverage} />
-            {spell.average == null
-              ? "-"
-              : Math.round(spell.average * 100) / 100}
+            {spell.average == null ? "-" : Math.round(spell.average * 10) / 10}
           </div>
           <div class="cell" style={gridcell(i, 4)}>
             <Bar full={(spell.stddev ?? 0) / maxStddev} />
-            {spell.stddev == null ? "-" : Math.round(spell.stddev * 100) / 100}
+            {spell.stddev == null ? "-" : Math.round(spell.stddev * 10) / 10}
           </div>
           <div class="cell" style={gridcell(i, 5, true)}>
             <Graph values={spell.damage} {maxValue} />
@@ -179,7 +181,7 @@
               style="gap: {group.attribs.flow === 'column' ? '0cm' : '1cm'};"
             >
               {#each group.params as param}
-                {#if param.attribs.type === "number"}
+                {#if param.id in pstate && param.attribs.type === "number"}
                   <div class="fdown facenter" style="gap: 0cm;">
                     {param.humanName}
                     <input
@@ -192,7 +194,7 @@
                     />
                   </div>
                 {/if}
-                {#if param.attribs.type === "range"}
+                {#if param.id in pstate && param.attribs.type === "range"}
                   <div class="fright" style="gap: 0.2cm">
                     <span style="width: 6em; text-align: right;"
                       >{param.humanName}</span
@@ -203,6 +205,7 @@
                       min={param.attribs.min}
                       max={param.attribs.max}
                       step={param.attribs.step}
+                      style="touch-action: none;"
                     />
                     <span style="width: 50px; text-align: left;">
                       {param.attribs.min < 0
@@ -224,13 +227,20 @@
     <div class="fright facenter" style="gap: 0.25cm; flex-wrap: wrap;">
       {#each bundled.BUNDLES as bundle}
         <button
-          class="preset-button preset-button-bg"
+          class="
+          preset-button preset-button-bg
+          {`bundle-${bundle.name}` in touched ? '' : 'shiny-and-new'}
+          "
+          onmouseenter={() => {
+            touched[`bundle-${bundle.name}`] = true;
+          }}
           onclick={() => {
             if (
               !bundled.BUNDLES.concat(saved).some(
                 (someBundle) => someBundle.source.trim() === src.trim(),
               )
             ) {
+              touched[`bundle-${bundle.name}`] = true;
               const confirmed = confirm(
                 "Loading a preset will delete your current spells. Do you still want to continue?",
               );
@@ -424,5 +434,32 @@
   }
   .preset-button-bg:active {
     background: #757481;
+  }
+
+  .shiny-and-new {
+    background: linear-gradient(
+      90deg,
+      #ff2400,
+      #e81d1d,
+      #e8b71d,
+      #e3e81d,
+      #1de840,
+      #1ddde8,
+      #2b1de8,
+      #dd00f3,
+      #dd00f3,
+      #ff2400
+    );
+    background-size: 300% 300%;
+    animation: rainbow 10s linear infinite;
+  }
+
+  @keyframes rainbow {
+    0% {
+      background-position: 0% 0%;
+    }
+    100% {
+      background-position: 300% 0%;
+    }
   }
 </style>

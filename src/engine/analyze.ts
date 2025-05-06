@@ -1,5 +1,5 @@
 import type { Expr } from "./ast"
-import { Context, getLevel, getReferences, type Params } from "./eval"
+import { Context, getLevel, getReferences, type Params, type Value } from "./eval"
 import * as distribution from "./distribution"
 import { parse } from "./parse"
 import { cmpKeyed } from "./util"
@@ -166,9 +166,15 @@ function parseLine(line: string, into: Parsed, lineNum: number) {
 }
 
 export function analyzeSpell(ctx: Context, spell: ParsedSpell): SpellAnalysis {
-    const level = getLevel(spell.expr)
-    const result = ctx.eval(spell.expr, ctx.globals)
-    if (result.ty !== 'distr') throw `Spell must return a number`
+    const spellLevel = getLevel(spell.expr)
+    const myLevel = ctx.getGlobal('level')
+    let result: Value
+    if (spellLevel != null && myLevel != null && myLevel < spellLevel) {
+        result = distribution.create([])
+    } else {
+        result = ctx.eval({ ty: 'unop', op: 'floor', inner: spell.expr }, ctx.globals)
+        if (result.ty !== 'distr') throw `Spell must return a number`
+    }
     const average = distribution.average(result)
     const damage: Map<number, number> = new Map(result.bins.entries().map(([val, cnt]) => {
         return [val, Number(cnt * BigInt(2 ** 53) / result.total) / 2 ** 53]
@@ -178,7 +184,7 @@ export function analyzeSpell(ctx: Context, spell: ParsedSpell): SpellAnalysis {
         name: spell.name,
         expr: spell.expr,
         damage,
-        level: level === -1 ? null : level,
+        level: spellLevel === -1 ? null : spellLevel,
         average,
         stddev: distribution.stddev(result, average),
         min: distribution.min(result),
@@ -237,7 +243,7 @@ export function analyze(source: string, p: Params): CollectionAnalysis {
     for (const group of parsed.definedParams) {
         for (const param of group.params) {
             const pvalue = p.get(param.id) ?? param.default
-            ctx.param(param.id, pvalue)
+            ctx.setGlobal(param.id, pvalue)
         }
     }
 

@@ -9,7 +9,7 @@
 
 This is a tool made to calculate the damage output of spells in Dungeons & Dragons (5th edition). To use it, you need to supply two things:
 
-- Spell definitions: Which spells you want to analyze. You can load spell presets or define your own using a special syntax.
+- Spell definitions: Which spells you want to analyze, and which parameters to play with. You can load spell presets or define your own using a special syntax.
 - Parameters: What level are you casting your spells at? What is the AC of your enemies? How many enemies can you hit at once with area spells?
     Usually these questions cannot be answered precisely, but you can guess and see what happens.
 

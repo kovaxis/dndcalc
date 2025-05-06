@@ -32,8 +32,18 @@ export class Context {
         this.globals = new Map(STANDARD_ENV)
     }
 
-    param(name: string, value: number) {
+    setGlobal(name: string, value: number) {
         this.globals.set(name, distribution.singular(value))
+    }
+
+    getGlobal(name: string): number | null {
+        const v = this.globals.get(name)
+        if (v?.ty === 'distr' && v.bins.size === 1) {
+            for (const val of v.bins.keys()) {
+                return val
+            }
+        }
+        return null
     }
 
     eval(expr: Expr, env: Env): Value {
@@ -251,9 +261,12 @@ export function getReferences(expr: Expr): string[] {
     return out
 }
 
-export function getLevel(expr: Expr): number {
-    let lvl = -1
+export function getLevel(expr: Expr): number | null {
+    let lvl: number | null = null
     if (expr.ty === 'lvl') lvl = expr.lvl
-    enter(expr, subexpr => lvl = Math.max(lvl, getLevel(subexpr)))
+    enter(expr, subexpr => {
+        const sublvl = getLevel(subexpr)
+        if (sublvl !== null && (lvl === null || sublvl > lvl)) lvl = sublvl
+    })
     return lvl
 }
