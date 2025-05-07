@@ -162,9 +162,25 @@
             <div class="cell" style={gridcell(i, 1)}>{spell.name}</div>
             <div class="cell" style={gridcell(i, 2)}>
               <Bar full={(spell.level ?? 0) / maxLevel} />
-              <span style:color={spell.level == null ? "red" : undefined}>
+              <span
+                style:color={spell.level == null
+                  ? "red"
+                  : spell.level != null &&
+                      spell.castedAtLevel != null &&
+                      spell.castedAtLevel !== spell.level
+                    ? "#888"
+                    : undefined}
+                style:text-decoration={spell.level != null &&
+                spell.castedAtLevel != null &&
+                spell.castedAtLevel > spell.level
+                  ? "line-through"
+                  : undefined}
+              >
                 {spell.level ?? "?"}
               </span>
+              {#if spell.level != null && spell.castedAtLevel != null && spell.castedAtLevel > spell.level}
+                {spell.castedAtLevel}
+              {/if}
             </div>
             <div class="cell" style={gridcell(i, 3)}>
               <Bar full={(spell.average ?? 0) / maxAverage} />
@@ -216,6 +232,12 @@
             {#if popupAnalysis}
               <div style="height:2em;"></div>
               <ShowExpr source={popupAnalysis.source} />
+              {#if popupAnalysis.levelTooHigh}
+                <div style="height:1em;"></div>
+                <p style="color:yellow;">
+                  Spell cannot be casted at the selected level!
+                </p>
+              {/if}
             {/if}
           </div>
           <button

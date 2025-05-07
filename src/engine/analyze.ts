@@ -11,6 +11,8 @@ export interface SpellAnalysis {
     expr: Expr
     damage: Map<number, number>
     level: number | null
+    levelTooHigh: boolean
+    castedAtLevel: number | null
     average: number | null
     stddev: number | null
     min: number | null
@@ -171,7 +173,8 @@ export function analyzeSpell(ctx: Context, spell: ParsedSpell): SpellAnalysis {
     const spellLevel = getLevel(spell.expr)
     const myLevel = ctx.getGlobal('level')
     let result: Value
-    if (spellLevel != null && myLevel != null && myLevel < spellLevel) {
+    const levelTooHigh = spellLevel != null && myLevel != null && myLevel < spellLevel
+    if (levelTooHigh) {
         result = distribution.create([])
     } else {
         result = ctx.eval({ ty: 'unop', op: 'floor', inner: spell.expr }, ctx.globals)
@@ -188,6 +191,8 @@ export function analyzeSpell(ctx: Context, spell: ParsedSpell): SpellAnalysis {
         expr: spell.expr,
         damage,
         level: spellLevel === -1 ? null : spellLevel,
+        levelTooHigh,
+        castedAtLevel: myLevel,
         average,
         stddev: distribution.stddev(result, average),
         min: distribution.min(result),
