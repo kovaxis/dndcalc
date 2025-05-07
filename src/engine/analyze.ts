@@ -5,6 +5,7 @@ import { parse } from "./parse"
 import { cmpKeyed } from "./util"
 
 export interface SpellAnalysis {
+    source: string
     lineNum: number
     name: string
     expr: Expr
@@ -36,6 +37,7 @@ export interface DefinedParamGroup {
 }
 
 export interface ParsedSpell {
+    source: string
     name: string
     expr: Expr
 }
@@ -126,7 +128,7 @@ function parseLine(line: string, into: Parsed, lineNum: number) {
             const raw = isSpell[2]
             if (!name) throw `Spell name cannot be empty`
             const expr = parse(raw, lineNum)
-            into.spells.push({ name, expr })
+            into.spells.push({ name, expr, source: raw })
         } else if (isDef) {
             name = isDef[1]
             const raw = isDef[2]
@@ -180,6 +182,7 @@ export function analyzeSpell(ctx: Context, spell: ParsedSpell): SpellAnalysis {
         return [val, Number(cnt * BigInt(2 ** 53) / result.total) / 2 ** 53]
     }))
     return {
+        source: spell.source,
         lineNum: spell.expr.line ?? 0,
         name: spell.name,
         expr: spell.expr,

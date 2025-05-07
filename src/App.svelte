@@ -7,6 +7,7 @@
   import { cmpKeyed } from "./engine/util";
   import Help from "./lib/Help.svelte";
   import { fade } from "svelte/transition";
+  import ShowExpr from "./lib/ShowExpr.svelte";
 
   function formatDelta(x: number): string {
     return `${x >= 0 ? "+" : ""}${x.toFixed()}`;
@@ -212,6 +213,10 @@
                 detail={true}
               />
             </div>
+            {#if popupAnalysis}
+              <div style="height:2em;"></div>
+              <ShowExpr source={popupAnalysis.source} />
+            {/if}
           </div>
           <button
             class="close-button"
