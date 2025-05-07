@@ -35,7 +35,7 @@
         }
 
         const splits = [];
-        const radius = Math.ceil(n * 0.1);
+        const radius = Math.ceil(n * 0.08);
         for (let i = 0; i <= n; i++) {
             let ismin = true;
             for (
