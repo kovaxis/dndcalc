@@ -6,6 +6,7 @@
   import Graph from "./lib/Graph.svelte";
   import { cmpKeyed } from "./engine/util";
   import Help from "./lib/Help.svelte";
+  import { fade } from "svelte/transition";
 
   function formatDelta(x: number): string {
     return `${x >= 0 ? "+" : ""}${x.toFixed()}`;
@@ -15,6 +16,8 @@
   const PARAMS_KEY: string = "params-state";
   const SAVED_KEY: string = "saved-presets";
   const TOUCHED_KEY: string = "touched-features";
+
+  type PopupState = { ty: "graph"; name: string; lineNum: number } | null;
 
   type ParamState = Record<string, number>;
 
@@ -60,6 +63,8 @@
     }
   });
 
+  let popup: PopupState = $state(null);
+
   let freezeSort = $state(false);
   let sortOrder: Map<string, number> = $state(new Map());
   $effect(() => {
@@ -73,6 +78,12 @@
     const sorted = [...analysis.spells];
     sorted.sort(cmpKeyed((spell) => [sortOrder.get(spell.name) ?? -1]));
     return sorted;
+  });
+
+  let popupAnalysis = $derived.by(() => {
+    if (popup?.ty !== "graph") return null;
+    const p = popup;
+    return analysis.spells.find((a) => a.name === p.name) ?? null;
   });
 
   $effect(() => {
@@ -109,7 +120,7 @@
 
   function gridcell(row: number, column: number, odd?: boolean) {
     odd = odd ?? row % 2 !== 0;
-    return `grid-column: ${column}; grid-row: ${row + 1}; background-color: ${odd ? "#303030" : ""}`;
+    return `grid-column: ${column}; grid-row: ${row + 1}; background-color: ${odd ? "#303030" : "unset"};`;
   }
 </script>
 
@@ -136,30 +147,79 @@
       </div>
       <div
         style="
-        display: grid; gap: 2px; grid-template-columns: {TABLE_COLUMNS}; grid-auto-rows: min-content; overflow-y: scroll;
-        border: 1px solid #888; border-radius: 3px;
+        border:1px solid #888; border-radius:3px; position:relative; overflow:hidden;
+        display:flex; flex-direction:column; align-items:stretch; justify-content:stretch;
         "
       >
-        {#each spellAnalysisSorted as spell, i}
-          <div class="cell" style={gridcell(i, 1)}>{spell.name}</div>
-          <div class="cell" style={gridcell(i, 2)}>
-            <Bar full={(spell.level ?? 0) / maxLevel} />
-            <span style:color={spell.level == null ? "red" : undefined}>
-              {spell.level ?? "?"}
-            </span>
+        <div
+          style="
+          display: grid; gap: 2px; grid-template-columns: {TABLE_COLUMNS}; grid-auto-rows: min-content;
+          overflow-y: scroll;
+          "
+        >
+          {#each spellAnalysisSorted as spell, i}
+            <div class="cell" style={gridcell(i, 1)}>{spell.name}</div>
+            <div class="cell" style={gridcell(i, 2)}>
+              <Bar full={(spell.level ?? 0) / maxLevel} />
+              <span style:color={spell.level == null ? "red" : undefined}>
+                {spell.level ?? "?"}
+              </span>
+            </div>
+            <div class="cell" style={gridcell(i, 3)}>
+              <Bar full={(spell.average ?? 0) / maxAverage} />
+              {spell.average == null
+                ? "-"
+                : Math.round(spell.average * 10) / 10}
+            </div>
+            <div class="cell" style={gridcell(i, 4)}>
+              <Bar full={(spell.stddev ?? 0) / maxStddev} />
+              {spell.stddev == null ? "-" : Math.round(spell.stddev * 10) / 10}
+            </div>
+            <div class="cell" style="{gridcell(i, 5)}; padding: 0;">
+              <button
+                class="preset-button-bg"
+                style="width: 100%; height: 100%; margin: 0; padding: 0; position: absolute; left: 0; top: 0; border: none;"
+                onclick={() => {
+                  popup = {
+                    ty: "graph",
+                    name: spell.name,
+                    lineNum: spell.lineNum,
+                  };
+                }}
+              >
+                <Graph values={spell.damage} {maxValue} />
+              </button>
+            </div>
+          {/each}
+        </div>
+        {#if popup}
+          <div
+            transition:fade|global={{ duration: 100 }}
+            class="fdown facenter"
+            style="
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #303030;
+            "
+          >
+            <h2>{popupAnalysis?.name ?? "?"}</h2>
+            <div
+              style="
+              margin: 0.5cm 0.5cm; position: relative; align-self: stretch; height: 8cm;
+              background: #242424;
+              "
+            >
+              <Graph
+                values={popupAnalysis?.damage ?? new Map()}
+                detail={true}
+              />
+            </div>
           </div>
-          <div class="cell" style={gridcell(i, 3)}>
-            <Bar full={(spell.average ?? 0) / maxAverage} />
-            {spell.average == null ? "-" : Math.round(spell.average * 10) / 10}
-          </div>
-          <div class="cell" style={gridcell(i, 4)}>
-            <Bar full={(spell.stddev ?? 0) / maxStddev} />
-            {spell.stddev == null ? "-" : Math.round(spell.stddev * 10) / 10}
-          </div>
-          <div class="cell" style={gridcell(i, 5, true)}>
-            <Graph values={spell.damage} {maxValue} />
-          </div>
-        {/each}
+          <button
+            class="close-button"
+            onclick={() => {
+              popup = null;
+            }}>X</button
+          >
+        {/if}
       </div>
     </div>
     <div class="spacer"></div>
@@ -403,6 +463,26 @@
     }
   }
 
+  .close-button {
+    position: absolute;
+    top: 1em;
+    right: 1em;
+    appearance: none;
+    background: #222;
+    border: none;
+    color: #fff;
+    border-radius: 50%;
+    width: 2em;
+    height: 2em;
+    font-weight: 900;
+  }
+  .close-button:hover {
+    background: #333;
+  }
+  .close-button:active {
+    background: #666;
+  }
+
   .preset-button {
     appearance: none;
     display: flex;
@@ -416,6 +496,7 @@
     height: fit-content;
     border: 1px solid #8f8f9d;
     overflow: hidden;
+    color: #fff;
   }
   .preset-button:hover {
     border: 1px solid #babac6;
