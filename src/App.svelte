@@ -405,7 +405,7 @@
 
   <span style="margin-bottom: 0.5em; opacity: 0.5;">
     Made by <a href="https://github.com/kovaxis">kovaxis</a> @ 2025.
-    <a href="https://github.com/kovaxis/dndcalc">Open source</a>.
+    <a href="https://github.com/kovaxis/dndmax">Open source</a>.
   </span>
 </main>
 
