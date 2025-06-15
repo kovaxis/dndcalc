@@ -15,30 +15,7 @@ export interface CallCtx {
   grown: bigint;
 }
 
-const STANDARD_ENV: Env = new Map(
-  Object.entries<Value>({
-    min: {
-      ty: "func",
-      params: ["a", "b"],
-      body: {
-        ty: "op",
-        op: "min",
-        lhs: { ty: "name", name: "a" },
-        rhs: { ty: "name", name: "b" },
-      },
-    },
-    max: {
-      ty: "func",
-      params: ["a", "b"],
-      body: {
-        ty: "op",
-        op: "max",
-        lhs: { ty: "name", name: "a" },
-        rhs: { ty: "name", name: "b" },
-      },
-    },
-  })
-);
+const STANDARD_ENV: Env = new Map(Object.entries<Value>({}));
 
 /**
  * Any value that an expression can take: a distribution (including constant numbers) or a function.

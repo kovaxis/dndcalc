@@ -1,9 +1,11 @@
 import {
   OP_CHARS,
+  OP_NAMES,
   UNOP_CHARS,
   type CoreExpr,
   type Expr,
   type OpChar,
+  type OpName,
   type UnopChar,
 } from "./ast";
 
@@ -91,6 +93,7 @@ class Parser {
       name = name.toLowerCase();
       const isDie = name.match(/^d([1-9][0-9]*)$/);
       const isLvl = name.match(/^lvl([1-9][0-9]*)$/);
+      const isBinop = (OP_NAMES as readonly string[]).includes(name);
       if (isDie) {
         const [, n] = isDie;
         return this.spanify({ ty: "die", n: parseInt(n) }, start);
@@ -107,6 +110,23 @@ class Parser {
           const close = this.char();
           if (close !== "]") throw `Expected closing square bracket`;
         }
+        return expr;
+      } else if (isBinop) {
+        const op = name as OpName;
+        let expr: Expr | null = null;
+        while (this.peek() === "[") {
+          this.char();
+          const subexpr = this.expr();
+          if (expr == null) expr = subexpr;
+          else
+            expr = this.spanify(
+              { ty: "op", op: op, lhs: expr, rhs: subexpr },
+              start
+            );
+          const close = this.char();
+          if (close !== "]") throw `Expected closing square bracket`;
+        }
+        if (expr == null) throw `Operator ${op} expects arguments`;
         return expr;
       } else if (name === "fn") {
         const params: string[] = [];
