@@ -17,6 +17,7 @@
   const PARAMS_KEY: string = "params-state";
   const SAVED_KEY: string = "saved-presets";
   const TOUCHED_KEY: string = "touched-features";
+  const PINNED_KEY: string = "pinned-spells";
 
   type PopupState = { ty: "graph"; name: string; lineNum: number } | null;
 
@@ -36,21 +37,24 @@
   }
 
   let saved = $state(
-    loadFromLocalStorage<Bundle[]>(SAVED_KEY, [], "saved bundles"),
+    loadFromLocalStorage<Bundle[]>(SAVED_KEY, [], "saved bundles")
   );
   let touched = $state(
     loadFromLocalStorage<Record<string, boolean>>(
       TOUCHED_KEY,
       {},
-      "touched features",
-    ),
+      "touched features"
+    )
+  );
+  let pinned = $state(
+    loadFromLocalStorage<Record<string, null>>(PINNED_KEY, {}, "pinned spells")
   );
 
   let src = $state(
-    localStorage.getItem(DRAFT_KEY) || bundled.EXAMPLE.source.trim(),
+    localStorage.getItem(DRAFT_KEY) || bundled.EXAMPLE.source.trim()
   );
   let pstate: ParamState = $state(
-    loadFromLocalStorage(PARAMS_KEY, {}, "parameter state"),
+    loadFromLocalStorage(PARAMS_KEY, {}, "parameter state")
   );
 
   let analysis = $derived(analyze(src, new Map(Object.entries(pstate))));
@@ -64,6 +68,18 @@
     }
   });
 
+  $effect(() => {
+    const spells = new Set();
+    for (const spell of analysis.spells) {
+      spells.add(spell.name);
+    }
+    for (const key of Object.keys(pinned)) {
+      if (!spells.has(key)) {
+        delete pinned[key];
+      }
+    }
+  });
+
   let popup: PopupState = $state(null);
 
   let freezeSort = $state(false);
@@ -71,7 +87,10 @@
   $effect(() => {
     if (!freezeSort) {
       sortOrder = new Map(
-        analysis.spells.map((spell, idx) => [spell.name, idx]),
+        analysis.spells.map((spell, idx) => [
+          spell.name,
+          idx + (spell.name in pinned ? 0 : analysis.spells.length),
+        ])
       );
     }
   });
@@ -99,29 +118,30 @@
   $effect(() => {
     localStorage.setItem(TOUCHED_KEY, JSON.stringify(touched));
   });
+  $effect(() => {
+    localStorage.setItem(PINNED_KEY, JSON.stringify(pinned));
+  });
 
   const maxLevel = $derived(
-    Math.max(1, ...analysis.spells.map((spell) => spell.level ?? 0)),
+    Math.max(1, ...analysis.spells.map((spell) => spell.level ?? 0))
   );
   const maxAverage = $derived(
     Math.ceil(
-      Math.max(1, ...analysis.spells.map((spell) => spell.average ?? 0)),
-    ),
+      Math.max(1, ...analysis.spells.map((spell) => spell.average ?? 0))
+    )
   );
   const maxStddev = $derived(
-    Math.ceil(
-      Math.max(1, ...analysis.spells.map((spell) => spell.stddev ?? 0)),
-    ),
+    Math.ceil(Math.max(1, ...analysis.spells.map((spell) => spell.stddev ?? 0)))
   );
   const maxValue = $derived(
-    Math.ceil(Math.max(1, ...analysis.spells.map((spell) => spell.max ?? 0))),
+    Math.ceil(Math.max(1, ...analysis.spells.map((spell) => spell.max ?? 0)))
   );
 
   const TABLE_COLUMNS: string = "minmax(6em, 1fr) 2.5em 3.5em 3.5em 6em";
 
   function gridcell(row: number, column: number, odd?: boolean) {
     odd = odd ?? row % 2 !== 0;
-    return `grid-column: ${column}; grid-row: ${row + 1}; background-color: ${odd ? "#303030" : "unset"};`;
+    return `grid-column: ${column}; grid-row: ${row + 1}; background-color: ${odd ? "unset" : "#303030"};`;
   }
 </script>
 
@@ -155,11 +175,33 @@
         <div
           style="
           display: grid; gap: 2px; grid-template-columns: {TABLE_COLUMNS}; grid-auto-rows: min-content;
-          overflow-y: scroll;
+          overflow-y: scroll; min-height: min(30vw, 30vh);
           "
         >
           {#each spellAnalysisSorted as spell, i}
-            <div class="cell" style={gridcell(i, 1)}>{spell.name}</div>
+            <div class="cell" style={`${gridcell(i, 1)}; padding: 0;`}>
+              <button
+                class="preset-button preset-button-bg"
+                style={`
+                display: block; width: 100%; height: 100%; margin: 0;
+                border: none; font-size: unset; border-radius: 0; text-align: left;
+                --button-idle-bg: #0000;
+                --button-hover-bg: #fff2;
+                --button-active-bg: #fff4;
+                font-weight: ${spell.name in pinned ? "bolder" : "normal"};
+                color: ${spell.name in pinned || Object.keys(pinned).length === 0 ? "white" : "#888"};
+                `}
+                onclick={() => {
+                  if (spell.name in pinned) {
+                    delete pinned[spell.name];
+                  } else {
+                    pinned[spell.name] = null;
+                  }
+                }}
+              >
+                {spell.name}
+              </button>
+            </div>
             <div class="cell" style={gridcell(i, 2)}>
               <Bar full={(spell.level ?? 0) / maxLevel} />
               <span
@@ -324,12 +366,12 @@
           onclick={() => {
             if (
               !bundled.BUNDLES.concat(saved).some(
-                (someBundle) => someBundle.source.trim() === src.trim(),
+                (someBundle) => someBundle.source.trim() === src.trim()
               )
             ) {
               touched[`bundle-${bundle.name}`] = true;
               const confirmed = confirm(
-                "Loading a preset will delete your current spells. Do you still want to continue?",
+                "Loading a preset will delete your current spells. Do you still want to continue?"
               );
               if (!confirmed) return;
             }
@@ -349,11 +391,11 @@
             onclick={() => {
               if (
                 !bundled.BUNDLES.concat(saved).some(
-                  (someBundle) => someBundle.source.trim() === src.trim(),
+                  (someBundle) => someBundle.source.trim() === src.trim()
                 )
               ) {
                 const confirmed = confirm(
-                  "Loading a preset will delete your current spells. Do you still want to continue?",
+                  "Loading a preset will delete your current spells. Do you still want to continue?"
                 );
                 if (!confirmed) return;
               }
@@ -367,7 +409,7 @@
             style="border: none;"
             onclick={() => {
               const confirmed = confirm(
-                `Do you want to delete the preset "${bundle.name}"?`,
+                `Do you want to delete the preset "${bundle.name}"?`
               );
               if (!confirmed) return;
               saved.splice(bundleIdx, 1);
@@ -382,11 +424,11 @@
         style="width: 1.75em;"
         onclick={() => {
           const exists = bundled.BUNDLES.concat(saved).find(
-            (someBundle) => someBundle.source.trim() === src.trim(),
+            (someBundle) => someBundle.source.trim() === src.trim()
           );
           if (exists) {
             alert(
-              `The current spell list is already saved as "${exists.name}"`,
+              `The current spell list is already saved as "${exists.name}"`
             );
             return;
           }
@@ -535,13 +577,16 @@
   .preset-button-bg {
     font-size: 24px;
     padding: 0.25em;
-    background: #2b2a33;
+    --button-idle-bg: #2b2a33;
+    background: var(--button-idle-bg);
   }
   .preset-button-bg:hover {
-    background: #575662;
+    --button-hover-bg: #575662;
+    background: var(--button-hover-bg);
   }
   .preset-button-bg:active {
-    background: #757481;
+    --button-active-bg: #757481;
+    background: var(--button-active-bg);
   }
 
   .shiny-and-new {
