@@ -1,11 +1,11 @@
 export interface Bundle {
-    name: string
-    source: string
+  name: string;
+  source: string;
 }
 
 export const EXAMPLE: Bundle = {
-    name: "Example",
-    source: `
+  name: "Example",
+  source: `
 # === A small selection of spells and sliders to visualize how things work ===
 
 # Repeat 3 times: 1d4+1 damage
@@ -70,13 +70,13 @@ define atk = fn roll { (roll != 1) * max[roll + spellmod >= ac][2 * (roll == 20)
 define dex = d20 + dexmod < 8 + spellmod
 define dexh = max[dex][0.5]
 `,
-}
+};
 
 export const BUNDLES: Bundle[] = [
-    EXAMPLE,
-    {
-        name: "D&D 5e Wizard",
-        source: `
+  EXAMPLE,
+  {
+    name: "D&D 5e Wizard",
+    source: `
 # Level 1
 Burning Hands: area dexh lvl1[3]d6
 Catapult: dex lvl1[3]d8
@@ -158,6 +158,6 @@ define wis = d20 + wismod < 8 + spellmod
 define wish = max[wis][0.5]
 define cha = d20 + chamod < 8 + spellmod
 define chah = max[cha][0.5]
-`
-    },
-]
+`,
+  },
+];

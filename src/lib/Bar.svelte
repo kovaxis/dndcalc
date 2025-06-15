@@ -1,14 +1,14 @@
 <script lang="ts">
-    export interface Props {
-        full: number;
-        opacity?: number;
-        color?: string;
-    }
-    const props: Props = $props();
+  export interface Props {
+    full: number;
+    opacity?: number;
+    color?: string;
+  }
+  const props: Props = $props();
 </script>
 
 <div
-    style="
+  style="
     position: absolute;
     opacity: {props.opacity ?? 0.2};
     background: {props.color ?? 'green'};

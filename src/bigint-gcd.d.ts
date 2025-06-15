@@ -1,3 +1,3 @@
-declare module 'bigint-gcd/gcd' {
-    export default function gcd(a: bigint, b: bigint): bigint;
+declare module "bigint-gcd/gcd" {
+  export default function gcd(a: bigint, b: bigint): bigint;
 }
