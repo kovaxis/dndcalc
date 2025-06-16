@@ -53,7 +53,7 @@
     loadFromLocalStorage<Record<string, null>>(PINNED_KEY, {}, "pinned spells")
   );
   let src = $state(
-    localStorage.getItem(DRAFT_KEY) || bundled.EXAMPLE.source.trim()
+    localStorage.getItem(DRAFT_KEY) || bundled.DEFAULT.source.trim()
   );
   let pstate: ParamState = $state(
     loadFromLocalStorage(PARAMS_KEY, {}, "parameter state")

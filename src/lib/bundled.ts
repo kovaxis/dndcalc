@@ -3,7 +3,7 @@ export interface Bundle {
   source: string;
 }
 
-export const EXAMPLE: Bundle = {
+const EXAMPLE: Bundle = {
   name: "Example",
   source: `
 # === A small selection of spells and sliders to visualize how things work ===
@@ -72,11 +72,9 @@ define dexh = max[dex][0.5]
 `,
 };
 
-export const BUNDLES: Bundle[] = [
-  EXAMPLE,
-  {
-    name: "D&D 5e",
-    source: `
+const DND5E: Bundle = {
+  name: "D&D 5e",
+  source: `
 # Level 1
 Absorb Elements: lvl1[1]d6
 Arms of Hadar: area strh lvl1[2]d6
@@ -190,10 +188,11 @@ define wish = max[wis][0.5]
 define cha = d20 + chamod < 8 + spellmod
 define chah = max[cha][0.5]
 `,
-  },
-  {
-    name: "D&D 5e Wizard",
-    source: `
+};
+
+const DND5E_WIZARD: Bundle = {
+  name: "D&D 5e Wizard",
+  source: `
 # Level 1
 Burning Hands: area dexh lvl1[3]d6
 Catapult: dex lvl1[3]d8
@@ -276,5 +275,7 @@ define wish = max[wis][0.5]
 define cha = d20 + chamod < 8 + spellmod
 define chah = max[cha][0.5]
 `,
-  },
-];
+};
+
+export const BUNDLES: Bundle[] = [EXAMPLE, DND5E, DND5E_WIZARD];
+export const DEFAULT: Bundle = DND5E;
