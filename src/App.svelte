@@ -467,7 +467,7 @@
   </div>
 
   <div id="spelldef" class="fdown facenter">
-    <h2>Spell definitions</h2>
+    <h2>Spell formulas</h2>
     <p style:padding="0 0.5em">
       Enter your spell collection, following the example format. See
       <a href="#help">help</a>

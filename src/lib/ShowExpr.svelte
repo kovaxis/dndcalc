@@ -6,7 +6,7 @@
 </script>
 
 <div style="padding: 0 0.5em;">
-  <span style="margin-right:1em;"> Damage: </span>
+  <span style="margin-right:0.5em;"> Formula: </span>
   <tt>
     {props.source}
   </tt>
