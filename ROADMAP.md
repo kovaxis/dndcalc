@@ -2,5 +2,4 @@
   - Compute not only the damage, but also the chance to stun, poison, etc.
   - Allow customizing the effect display, and unhardcode the `Level` column.
 - Define functions with optional parameters
-- Caching
 - Multithreading

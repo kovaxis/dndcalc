@@ -10,13 +10,13 @@ import {
 } from "./ast";
 
 class Parser {
-  lineNum?: number;
-  startChar?: number;
+  lineNum: number;
+  startChar: number;
 
   src: string;
   i: number;
 
-  constructor(src: string, lineNum?: number, startChar?: number) {
+  constructor(src: string, lineNum: number, startChar: number) {
     this.lineNum = lineNum;
     this.startChar = startChar;
 
@@ -45,7 +45,6 @@ class Parser {
   }
 
   spanify(expr: CoreExpr, start: number, end?: number): Expr {
-    if (this.lineNum == null || this.startChar == null) return expr;
     end = end ?? this.i;
     return {
       ...expr,
@@ -56,7 +55,7 @@ class Parser {
   }
 
   extend(expr: CoreExpr, base: Expr, end?: number): Expr {
-    if (this.startChar == null || base.char == null) return expr;
+    if (base.char == null) return expr;
     end = end ?? this.i;
     return {
       ...expr,
@@ -100,7 +99,7 @@ class Parser {
       } else if (isLvl) {
         const [, lvl] = isLvl;
         this.trim();
-        let expr: Expr = { ty: "lvl", lvl: parseInt(lvl) };
+        let expr: Expr = this.spanify({ ty: "lvl", lvl: parseInt(lvl) }, start);
         if (this.peek() === "[") {
           this.char();
           expr = this.extend(
@@ -197,7 +196,7 @@ class Parser {
   }
 }
 
-export function parse(raw: string, lineNum?: number, startChar?: number): Expr {
+export function parse(raw: string, lineNum: number, startChar: number): Expr {
   const parser = new Parser(raw, lineNum, startChar);
   const expr = parser.expr();
   if (parser.peek() !== undefined) throw `Too many closing parenthesis`;

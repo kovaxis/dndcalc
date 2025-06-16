@@ -1,11 +1,5 @@
-import type { Expr } from "./ast";
-import {
-  Context,
-  getLevel,
-  getReferences,
-  type Params,
-  type Value,
-} from "./eval";
+import type { Expr, Value } from "./ast";
+import { Cache, Context, getLevel, getReferences, type Params } from "./eval";
 import * as distribution from "./distribution";
 import { parse } from "./parse";
 import { cmpKeyed } from "./util";
@@ -134,8 +128,8 @@ function parseAttribs<T>(raw: string, model: AttribModel): T {
 }
 
 function parseLine(line: string, into: Parsed, lineNum: number) {
-  const isSpell = /^\s*([^:]*?)\s*\:(.*)$/.exec(line);
-  const isDef = /^\s*define\s+([a-zA-Z_][a-zA-Z_0-9]*)\s*=\s*(.*?)\s*$/.exec(
+  const isSpell = /^(\s*([^:]*?)\s*\:\s*)(.*)\s*$/.exec(line);
+  const isDef = /^(\s*define\s+([a-zA-Z_][a-zA-Z_0-9]*)\s*=\s*)(.*?)\s*$/.exec(
     line
   );
   const isGroup = /^\s*group(\s*(?:\[[^\]]*\])+\s*|\s+)\s*(.*?)\s*$/.exec(line);
@@ -146,17 +140,19 @@ function parseLine(line: string, into: Parsed, lineNum: number) {
   let name = null;
   try {
     if (isSpell) {
-      name = isSpell[1];
-      const raw = isSpell[2];
+      const preamble = isSpell[1];
+      name = isSpell[2];
+      const raw = isSpell[3];
       if (!name) throw `Spell name cannot be empty`;
-      const expr = parse(raw, lineNum);
+      const expr = parse(raw, lineNum, preamble.length);
       into.spells.push({ name, expr, source: raw });
     } else if (isDef) {
-      name = isDef[1];
-      const raw = isDef[2];
+      const preamble = isDef[1];
+      name = isDef[2];
+      const raw = isDef[3];
       if (!name) throw `Definition name cannot be empty`;
       if (isDefined(into, name)) throw `Duplicated definition of ${name}`;
-      const expr = parse(raw);
+      const expr = parse(raw, lineNum, preamble.length);
       into.defs[name] = expr;
     } else if (isGroup) {
       name = isGroup[2];
@@ -197,17 +193,14 @@ function parseLine(line: string, into: Parsed, lineNum: number) {
 
 export function analyzeSpell(ctx: Context, spell: ParsedSpell): SpellAnalysis {
   const spellLevel = getLevel(spell.expr);
-  const myLevel = ctx.getGlobal("level");
+  const myLevel = ctx.globals.getNumber("level") ?? null;
   let result: Value;
   const levelTooHigh =
     spellLevel != null && myLevel != null && myLevel < spellLevel;
   if (levelTooHigh) {
     result = distribution.create([]);
   } else {
-    result = ctx.eval(
-      { ty: "unop", op: "floor", inner: spell.expr },
-      ctx.globals
-    );
+    result = ctx.eval({ ty: "unop", op: "floor", inner: spell.expr });
     if (result.ty !== "distr") throw `Spell must return a number`;
   }
   const average = distribution.average(result);
@@ -254,7 +247,7 @@ function define(
     }
 
     // Evaluate
-    const defined = ctx.eval(expr, ctx.globals);
+    const defined = ctx.eval(expr);
     ctx.globals.set(name, defined);
   } catch (e) {
     console.error(e);
@@ -264,7 +257,12 @@ function define(
   }
 }
 
-export function analyze(source: string, p: Params): CollectionAnalysis {
+export function analyze(
+  source: string,
+  p: Params,
+  cache: Cache
+): CollectionAnalysis {
+  cache.gc();
   const analysis: CollectionAnalysis = {
     spells: [],
     errors: [],
@@ -292,12 +290,12 @@ export function analyze(source: string, p: Params): CollectionAnalysis {
   });
 
   // Fill in parameters
-  const ctx = new Context();
+  const ctx = new Context(cache);
   analysis.wantParams = parsed.definedParams;
   for (const group of parsed.definedParams) {
     for (const param of group.params) {
       const pvalue = p.get(param.id) ?? param.default;
-      ctx.setGlobal(param.id, pvalue);
+      ctx.globals.setNumber(param.id, pvalue);
     }
   }
 

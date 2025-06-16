@@ -1,3 +1,5 @@
+import type { Distr } from "./distribution";
+
 export const OP_CHARS = {
   "<": [9, "l"],
   ">": [9, "l"],
@@ -97,4 +99,15 @@ export type Atom = Lit | Die | Level | Name;
 
 export type CoreExpr = Atom | Op | Unop | Call | Func;
 
-export type Expr = CoreExpr & { line?: number; char?: number; span?: number };
+export type Expr = CoreExpr & {
+  line?: number;
+  char?: number;
+  span?: number;
+  hash?: number;
+  deps?: string[];
+};
+
+/**
+ * Any value that an expression can take: a distribution (including constant numbers) or a function.
+ */
+export type Value = Distr | Func;

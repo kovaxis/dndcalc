@@ -8,6 +8,7 @@
   import Help from "./lib/Help.svelte";
   import { fade } from "svelte/transition";
   import ShowExpr from "./lib/ShowExpr.svelte";
+  import { Cache } from "./engine/eval";
 
   function formatDelta(x: number): string {
     return `${x >= 0 ? "+" : ""}${x.toFixed()}`;
@@ -57,7 +58,10 @@
     loadFromLocalStorage(PARAMS_KEY, {}, "parameter state")
   );
 
-  let analysis = $derived(analyze(src, new Map(Object.entries(pstate))));
+  const analysisCache = new Cache();
+  let analysis = $derived(
+    analyze(src, new Map(Object.entries(pstate)), analysisCache)
+  );
   $inspect(analysis);
 
   $effect(() => {
