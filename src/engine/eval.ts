@@ -127,15 +127,12 @@ function dependsOn(expr: Expr): string[] {
 
 export class Env {
   #map: Map<string, Value>;
-  #hash: number;
 
   constructor(from?: Env) {
     if (from == null) {
       this.#map = new Map();
-      this.#hash = 0;
     } else {
       this.#map = new Map(from.#map);
-      this.#hash = from.#hash;
     }
   }
 
@@ -152,13 +149,7 @@ export class Env {
   }
 
   set(key: string, val: Value) {
-    //const keyHash = hash.string(0, key);
-    //const prev = this.#map.get(key);
-    //if (prev !== undefined) {
-    //  this.#hash -= hash.value(keyHash, prev);
-    //}
     this.#map.set(key, val);
-    //this.#hash += hash.value(keyHash, val);
   }
 
   setNumber(key: string, num: number) {
@@ -177,10 +168,6 @@ export class Env {
       }
     }
     return undefined;
-  }
-
-  get hash() {
-    return this.#hash;
   }
 }
 
