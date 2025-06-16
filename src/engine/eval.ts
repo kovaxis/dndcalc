@@ -117,10 +117,11 @@ function dependsOn(expr: Expr): string[] {
       return (expr.deps = deps);
     case "unop":
       return (expr.deps = dependsOn(expr.inner));
+    case "lvl":
+      return (expr.deps = ["level"]);
     case "die":
     case "func":
     case "lit":
-    case "lvl":
       return [];
   }
 }
