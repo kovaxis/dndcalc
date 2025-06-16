@@ -119,10 +119,10 @@
 
   // Display order for the spells
   // Can be frozen using a checkbox
-  let freezeSort = $state(false);
+  let autoSort = $state(true);
   let sortOrder: Map<string, number> = $state(new Map());
   $effect(() => {
-    if (!freezeSort) {
+    if (autoSort) {
       sortOrder = new Map(
         analysis.spells.map((spell, idx) => [
           spell.name,
@@ -174,8 +174,8 @@
       <div class="fright facenter" style="justify-content: space-between;">
         <h2>Damage analysis</h2>
         <label>
-          <input type="checkbox" bind:checked={freezeSort} />
-          Freeze display order
+          <input type="checkbox" bind:checked={autoSort} />
+          Sorted by damage
         </label>
       </div>
       <div
