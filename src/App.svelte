@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { analyze } from "./engine/analyze";
+  import { type CollectionAnalysis } from "./engine/analyze";
   import Bar from "./lib/Bar.svelte";
   import type { Bundle } from "./lib/bundled";
   import * as bundled from "./lib/bundled";
@@ -8,7 +8,8 @@
   import Help from "./lib/Help.svelte";
   import { fade } from "svelte/transition";
   import ShowExpr from "./lib/ShowExpr.svelte";
-  import { Cache } from "./engine/eval";
+  import Worker from "./engine/worker?worker";
+  import type { AnalyzeMessage, ResultMessage } from "./engine/worker";
 
   function formatDelta(x: number): string {
     return `${x >= 0 ? "+" : ""}${x.toFixed()}`;
@@ -37,6 +38,7 @@
     return something;
   }
 
+  // All sorts of persistent state
   let saved = $state(
     loadFromLocalStorage<Bundle[]>(SAVED_KEY, [], "saved bundles")
   );
@@ -50,7 +52,6 @@
   let pinned = $state(
     loadFromLocalStorage<Record<string, null>>(PINNED_KEY, {}, "pinned spells")
   );
-
   let src = $state(
     localStorage.getItem(DRAFT_KEY) || bundled.EXAMPLE.source.trim()
   );
@@ -58,12 +59,53 @@
     loadFromLocalStorage(PARAMS_KEY, {}, "parameter state")
   );
 
-  const analysisCache = new Cache();
-  let analysis = $derived(
-    analyze(src, new Map(Object.entries(pstate)), analysisCache)
-  );
+  // Persist state
+  $effect(() => {
+    localStorage.setItem(DRAFT_KEY, src);
+  });
+  $effect(() => {
+    localStorage.setItem(PARAMS_KEY, JSON.stringify(pstate));
+  });
+  $effect(() => {
+    localStorage.setItem(SAVED_KEY, JSON.stringify(saved));
+  });
+  $effect(() => {
+    localStorage.setItem(TOUCHED_KEY, JSON.stringify(touched));
+  });
+  $effect(() => {
+    localStorage.setItem(PINNED_KEY, JSON.stringify(pinned));
+  });
+
+  // Store the parsed and computed spells here
+  let analysis: CollectionAnalysis = $state({
+    errors: [],
+    spells: [],
+    wantParams: [],
+  });
   $inspect(analysis);
 
+  // Recalculate analysis when source or params change, in a background thread
+  const worker = new Worker({ name: "analysis-engine-worker" });
+  $effect(() => {
+    const msg: AnalyzeMessage = {
+      type: "analyze",
+      source: $state.snapshot(src),
+      params: $state.snapshot(pstate),
+    };
+    worker.postMessage(msg);
+  });
+  worker.addEventListener("message", (ev) => {
+    const msg: unknown = ev.data;
+    if (msg && typeof msg === "object" && "type" in msg) {
+      switch (msg.type) {
+        case "result":
+          const data = msg as ResultMessage;
+          analysis = data.result;
+      }
+    }
+  });
+
+  // Initialize parameters from the parameters that the spells need
   $effect(() => {
     for (const group of analysis.wantParams) {
       for (const param of group.params) {
@@ -72,20 +114,11 @@
     }
   });
 
-  $effect(() => {
-    const spells = new Set();
-    for (const spell of analysis.spells) {
-      spells.add(spell.name);
-    }
-    for (const key of Object.keys(pinned)) {
-      if (!spells.has(key)) {
-        delete pinned[key];
-      }
-    }
-  });
-
+  // Whether the spell analysis popup is open or not
   let popup: PopupState = $state(null);
 
+  // Display order for the spells
+  // Can be frozen using a checkbox
   let freezeSort = $state(false);
   let sortOrder: Map<string, number> = $state(new Map());
   $effect(() => {
@@ -104,28 +137,14 @@
     return sorted;
   });
 
+  // If the popup is open, find the analysis for the open spell
   let popupAnalysis = $derived.by(() => {
     if (popup?.ty !== "graph") return null;
     const p = popup;
     return analysis.spells.find((a) => a.name === p.name) ?? null;
   });
 
-  $effect(() => {
-    localStorage.setItem(DRAFT_KEY, src);
-  });
-  $effect(() => {
-    localStorage.setItem(PARAMS_KEY, JSON.stringify(pstate));
-  });
-  $effect(() => {
-    localStorage.setItem(SAVED_KEY, JSON.stringify(saved));
-  });
-  $effect(() => {
-    localStorage.setItem(TOUCHED_KEY, JSON.stringify(touched));
-  });
-  $effect(() => {
-    localStorage.setItem(PINNED_KEY, JSON.stringify(pinned));
-  });
-
+  // Several global stats
   const maxLevel = $derived(
     Math.max(1, ...analysis.spells.map((spell) => spell.level ?? 0))
   );
@@ -141,8 +160,8 @@
     Math.ceil(Math.max(1, ...analysis.spells.map((spell) => spell.max ?? 0)))
   );
 
+  // Table layout
   const TABLE_COLUMNS: string = "minmax(6em, 1fr) 2.5em 3.5em 3.5em 6em";
-
   function gridcell(row: number, column: number, odd?: boolean) {
     odd = odd ?? row % 2 !== 0;
     return `grid-column: ${column}; grid-row: ${row + 1}; background-color: ${odd ? "unset" : "#303030"};`;
