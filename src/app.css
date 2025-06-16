@@ -19,6 +19,10 @@ body {
   margin: 0px;
 }
 
+button {
+  cursor: pointer;
+}
+
 .fdown {
   display: flex;
   flex-direction: column;
