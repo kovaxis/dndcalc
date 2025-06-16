@@ -156,8 +156,10 @@
   const maxStddev = $derived(
     Math.ceil(Math.max(1, ...analysis.spells.map((spell) => spell.stddev ?? 0)))
   );
-  const maxValue = $derived(
-    Math.ceil(Math.max(1, ...analysis.spells.map((spell) => spell.max ?? 0)))
+  const maxReasonableValue = $derived(
+    Math.ceil(
+      Math.max(1, ...analysis.spells.map((spell) => spell.maxReasonable ?? 0))
+    )
   );
 
   // Table layout
@@ -269,7 +271,7 @@
                   };
                 }}
               >
-                <Graph values={spell.damage} {maxValue} />
+                <Graph values={spell.damage} maxValue={maxReasonableValue} />
               </button>
             </div>
           {/each}

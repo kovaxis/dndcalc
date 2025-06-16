@@ -74,3 +74,43 @@ export function max(table: Distr): number | null {
   const max = Math.max(...table.bins.keys());
   return max === -Infinity ? null : max;
 }
+
+export function maxReasonable(
+  table: Distr,
+  minProbability: number
+): number | null {
+  if (table.bins.size === 0) return null;
+  let upper = 0n;
+  for (const cnt of table.bins.values()) {
+    if (cnt > upper) upper = cnt;
+  }
+  const threshold =
+    (BigInt(Math.ceil(minProbability * 2 ** 53)) * upper) / BigInt(2 ** 53);
+  let max = null;
+  for (const [val, cnt] of table.bins) {
+    if (cnt >= threshold && (max === null || val > max)) {
+      max = val;
+    }
+  }
+  return max;
+}
+
+export function minReasonable(
+  table: Distr,
+  minProbability: number
+): number | null {
+  if (table.bins.size === 0) return null;
+  let upper = 0n;
+  for (const cnt of table.bins.values()) {
+    if (cnt > upper) upper = cnt;
+  }
+  const threshold =
+    (BigInt(Math.ceil(minProbability * 2 ** 53)) * upper) / BigInt(2 ** 53);
+  let min = null;
+  for (const [val, cnt] of table.bins) {
+    if (cnt >= threshold && (min === null || val < min)) {
+      min = val;
+    }
+  }
+  return min;
+}

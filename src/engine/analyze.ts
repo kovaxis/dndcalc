@@ -17,6 +17,8 @@ export interface SpellAnalysis {
   stddev: number | null;
   min: number | null;
   max: number | null;
+  minReasonable: number | null;
+  maxReasonable: number | null;
 }
 
 export interface CollectionAnalysis {
@@ -222,6 +224,8 @@ export function analyzeSpell(ctx: Context, spell: ParsedSpell): SpellAnalysis {
     stddev: distribution.stddev(result, average),
     min: distribution.min(result),
     max: distribution.max(result),
+    maxReasonable: distribution.maxReasonable(result, 1 / 50),
+    minReasonable: distribution.minReasonable(result, 1 / 50),
   };
 }
 
