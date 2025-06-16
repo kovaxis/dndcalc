@@ -179,7 +179,56 @@ export interface CallCtx {
   grown: bigint;
 }
 
-const STANDARD_ENV: Env = Env.fromObject({});
+const STANDARD_ENV: Env = Env.fromObject({
+  if: {
+    ty: "func",
+    params: ["c", "t", "f"],
+    body: {
+      ty: "op",
+      op: "+",
+      lhs: {
+        ty: "op",
+        op: "*",
+        lhs: {
+          ty: "op",
+          op: "!=",
+          lhs: {
+            ty: "name",
+            name: "c",
+          },
+          rhs: {
+            ty: "lit",
+            lit: 0,
+          },
+        },
+        rhs: {
+          ty: "name",
+          name: "t",
+        },
+      },
+      rhs: {
+        ty: "op",
+        op: "*",
+        lhs: {
+          ty: "op",
+          op: "==",
+          lhs: {
+            ty: "name",
+            name: "c",
+          },
+          rhs: {
+            ty: "lit",
+            lit: 0,
+          },
+        },
+        rhs: {
+          ty: "name",
+          name: "f",
+        },
+      },
+    },
+  },
+});
 
 export class Cache {
   #cached: Map<number, Value>;
