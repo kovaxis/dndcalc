@@ -151,6 +151,10 @@ define add_and_multiply = fn x y { x + y + x*y }
 
 You can then use `add_and_multiply` like `add_and_multiply[d8][d8]`.
 
+#### Example
+
+See the `Example` preset for more details on how to create your own spells.
+
 ### Syntax reference
 
 - `dN` (where `N` is a number): Roll an `N` sided die.
